@@ -59,8 +59,9 @@ jobs:
     name: Integration Tests (NC ${{ matrix.nextcloud-version }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        nextcloud-version: ["stable33", "latest"]
+        nextcloud-version: ["31", "32"]
     services:
       nextcloud:
         image: nextcloud:${{ matrix.nextcloud-version }}
