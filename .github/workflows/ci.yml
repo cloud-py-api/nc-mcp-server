@@ -28,6 +28,9 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
 
+      - name: isort check
+        run: isort --check .
+
       - name: Pyright
         run: pyright
 
@@ -53,11 +56,14 @@ jobs:
         run: pytest tests/ -v --ignore=tests/integration/
 
   test-integration:
-    name: Integration Tests
+    name: Integration Tests (NC ${{ matrix.nextcloud-version }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nextcloud-version: ["stable33", "latest"]
     services:
       nextcloud:
-        image: nextcloud:latest
+        image: nextcloud:${{ matrix.nextcloud-version }}
         env:
           SQLITE_DATABASE: nextcloud
           NEXTCLOUD_ADMIN_USER: admin
@@ -93,11 +99,13 @@ jobs:
             sleep 3
           done
 
-      - name: Disable rate limiting
+      - name: Configure Nextcloud for testing
         run: |
-          # Install occ wrapper — Nextcloud in Docker uses www-data
-          docker exec ${{ job.services.nextcloud.id }} su -s /bin/bash www-data -c "php occ config:system:set ratelimit_protection_enabled --value=false --type=boolean" || true
-          docker exec ${{ job.services.nextcloud.id }} su -s /bin/bash www-data -c "php occ config:system:set auth.bruteforce.protection.enabled --value=false --type=boolean" || true
+          NC_CONTAINER=${{ job.services.nextcloud.id }}
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ config:system:set ratelimit_protection_enabled --value=false --type=boolean"
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ config:system:set auth.bruteforce.protection.enabled --value=false --type=boolean"
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ config:system:set loglevel --value=0 --type=integer"
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:list" | head -30
 
       - name: Run integration tests
         env:
@@ -105,3 +113,8 @@ jobs:
           NEXTCLOUD_USER: admin
           NEXTCLOUD_PASSWORD: admin
         run: pytest tests/integration/ -v -m integration
+
+      - name: Dump Nextcloud logs on failure
+        if: failure()
+        run: |
+          docker exec ${{ job.services.nextcloud.id }} cat /var/www/html/data/nextcloud.log 2>/dev/null | tail -50 || echo "No logs found"

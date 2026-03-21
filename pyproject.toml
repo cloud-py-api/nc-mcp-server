@@ -66,11 +66,11 @@ lint.select = [
 ]
 lint.extend-ignore = [
   "I001",
-  "RUF100",
   "S311",
   "S603",
   "SIM117",
 ]
+lint.extend-per-file-ignores."src/nextcloud_mcp/client.py" = [ "S314" ]
 lint.extend-per-file-ignores."src/nextcloud_mcp/config.py" = [ "S104" ]
 lint.extend-per-file-ignores."tests/**/*.py" = [ "E402", "S", "UP" ]
 

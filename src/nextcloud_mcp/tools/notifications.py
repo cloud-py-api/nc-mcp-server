@@ -30,16 +30,14 @@ def register(mcp: FastMCP) -> None:
         return json.dumps(data, indent=2, default=str)
 
     @mcp.tool()
-    @require_permission(PermissionLevel.WRITE)
+    @require_permission(PermissionLevel.DESTRUCTIVE)
     async def dismiss_notification(notification_id: int) -> str:
-        """Dismiss (delete) a single notification by its ID.
+        """Dismiss (permanently delete) a single notification by its ID.
 
-        Use list_notifications first to find the notification_id to
-        dismiss.
+        Use list_notifications first to find the notification_id to dismiss.
 
         Args:
-            notification_id: The numeric ID of the notification to
-                dismiss.
+            notification_id: The numeric ID of the notification to dismiss.
 
         Returns:
             Confirmation message.
@@ -49,3 +47,18 @@ def register(mcp: FastMCP) -> None:
             f"apps/notifications/api/v2/notifications/{notification_id}",
         )
         return f"Notification {notification_id} dismissed."
+
+    @mcp.tool()
+    @require_permission(PermissionLevel.DESTRUCTIVE)
+    async def dismiss_all_notifications() -> str:
+        """Dismiss (permanently delete) ALL notifications for the current user.
+
+        This cannot be undone. Use list_notifications first to review
+        what will be dismissed.
+
+        Returns:
+            Confirmation message.
+        """
+        client = get_client()
+        await client.ocs_delete("apps/notifications/api/v2/notifications")
+        return "All notifications dismissed."

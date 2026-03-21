@@ -4,7 +4,7 @@ import contextlib
 
 import pytest
 
-from nextcloud_mcp.client import NextcloudClient
+from nextcloud_mcp.client import NextcloudClient, NextcloudError
 
 pytestmark = pytest.mark.integration
 
@@ -63,3 +63,10 @@ class TestFileOperations:
         # 7. Cleanup — delete file and directory
         await nc_client.dav_delete(moved_path)
         await nc_client.dav_delete(self.TEST_DIR)
+
+
+class TestErrorHandling:
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_file_raises(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match=r"Not found"):
+            await nc_client.dav_get("this-file-does-not-exist-12345.txt")
