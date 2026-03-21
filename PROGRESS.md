@@ -11,9 +11,9 @@
 - [x] Unit tests: permissions, config (2026-03-20)
 - [x] Integration tests: files lifecycle, users (2026-03-20)
 - [x] CI pipeline: lint + unit tests + integration tests with real Nextcloud (2026-03-20)
+- [x] Notifications tools: list_notifications, dismiss_notification (2026-03-21)
 
 ### In Progress
-- [ ] Notifications tools: list_notifications, dismiss_notification
 - [ ] Activity tools: get_activity
 - [ ] search_files tool (WebDAV SEARCH/REPORT)
 

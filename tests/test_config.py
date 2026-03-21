@@ -1,9 +1,5 @@
 """Tests for configuration loading."""
 
-from __future__ import annotations
-
-import os
-
 import pytest
 
 from nextcloud_mcp.config import Config
@@ -92,7 +88,7 @@ class TestConfigValidation:
 
     def test_missing_multiple_shows_all(self) -> None:
         config = Config(nextcloud_url="", user="", password="")
-        with pytest.raises(ValueError, match="NEXTCLOUD_URL.*NEXTCLOUD_USER.*NEXTCLOUD_PASSWORD"):
+        with pytest.raises(ValueError, match=r"NEXTCLOUD_URL.*NEXTCLOUD_USER.*NEXTCLOUD_PASSWORD"):
             config.validate()
 
     def test_valid_config_passes(self) -> None:

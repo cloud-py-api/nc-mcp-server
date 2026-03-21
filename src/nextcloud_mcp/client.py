@@ -1,13 +1,38 @@
 """HTTP client for Nextcloud REST/OCS/DAV APIs."""
 
-from __future__ import annotations
-
+import contextlib
 import xml.etree.ElementTree as ET
 from typing import Any
 
 import niquests
 
 from .config import Config
+
+
+class NextcloudError(Exception):
+    """Human-readable error from a Nextcloud API call."""
+
+    def __init__(self, message: str, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__(message)
+
+
+def _raise_for_status(response: niquests.Response, context: str = "") -> None:
+    """Raise NextcloudError with a helpful message instead of raw HTTPError."""
+    if response.ok:
+        return
+    code = response.status_code or 0
+    prefix = f"{context}: " if context else ""
+    messages: dict[int, str] = {
+        401: "Authentication failed. Check NEXTCLOUD_USER and NEXTCLOUD_PASSWORD.",
+        403: "Forbidden. The user does not have permission for this operation.",
+        404: "Not found.",
+        409: "Conflict. The resource may already exist or the parent directory is missing.",
+        423: "Locked. The resource is currently locked by another process.",
+    }
+    detail = messages.get(code, f"HTTP {code}")
+    raise NextcloudError(f"{prefix}{detail}", code)
+
 
 # XML namespaces used in WebDAV responses
 DAV_NS = "DAV:"
@@ -63,30 +88,30 @@ class NextcloudClient:
 
     # --- OCS API ---
 
-    async def ocs_get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def ocs_get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Make an OCS GET request and return the data portion."""
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.get(url, params=params or {})
-        response.raise_for_status()
-        result: dict[str, Any] = response.json()
-        return result["ocs"]["data"]  # type: ignore[no-any-return]
+        _raise_for_status(response, f"OCS GET {path}")
+        result: dict[str, Any] = response.json()  # type: ignore[assignment]
+        return result["ocs"]["data"]
 
-    async def ocs_post(self, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def ocs_post(self, path: str, data: dict[str, Any] | None = None) -> Any:
         """Make an OCS POST request and return the data portion."""
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.post(url, data=data or {})
-        response.raise_for_status()
-        result: dict[str, Any] = response.json()
-        return result["ocs"]["data"]  # type: ignore[no-any-return]
+        _raise_for_status(response, f"OCS POST {path}")
+        result: dict[str, Any] = response.json()  # type: ignore[assignment]
+        return result["ocs"]["data"]
 
     async def ocs_delete(self, path: str) -> None:
         """Make an OCS DELETE request."""
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.delete(url)
-        response.raise_for_status()
+        _raise_for_status(response, f"OCS DELETE {path}")
 
     # --- WebDAV ---
 
@@ -104,8 +129,9 @@ class NextcloudClient:
                 "Content-Type": "application/xml; charset=utf-8",
             },
         )
-        response.raise_for_status()
-        return self._parse_propfind(response.text, user)
+        _raise_for_status(response, f"List directory '{path}'")
+        text = response.text or ""
+        return self._parse_propfind(text, user)
 
     async def dav_get(self, path: str) -> bytes:
         """GET a file's content via WebDAV."""
@@ -113,8 +139,8 @@ class NextcloudClient:
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.get(url)
-        response.raise_for_status()
-        return response.content
+        _raise_for_status(response, f"Get file '{path}'")
+        return response.content or b""
 
     async def dav_put(self, path: str, content: bytes, content_type: str = "application/octet-stream") -> None:
         """PUT (upload/overwrite) a file via WebDAV."""
@@ -122,7 +148,7 @@ class NextcloudClient:
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.put(url, data=content, headers={"Content-Type": content_type})
-        response.raise_for_status()
+        _raise_for_status(response, f"Upload file '{path}'")
 
     async def dav_delete(self, path: str) -> None:
         """DELETE a file or folder via WebDAV."""
@@ -130,7 +156,7 @@ class NextcloudClient:
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.delete(url)
-        response.raise_for_status()
+        _raise_for_status(response, f"Delete '{path}'")
 
     async def dav_mkcol(self, path: str) -> None:
         """MKCOL (create directory) via WebDAV."""
@@ -138,7 +164,7 @@ class NextcloudClient:
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.request("MKCOL", url)
-        response.raise_for_status()
+        _raise_for_status(response, f"Create directory '{path}'")
 
     async def dav_move(self, source: str, destination: str) -> None:
         """MOVE a file or folder via WebDAV."""
@@ -151,7 +177,7 @@ class NextcloudClient:
             src_url,
             headers={"Destination": dest_url, "Overwrite": "F"},
         )
-        response.raise_for_status()
+        _raise_for_status(response, f"Move '{source}' to '{destination}'")
 
     # --- Parsing ---
 
@@ -169,11 +195,7 @@ class NextcloudClient:
 
             href = href_el.text
             # Strip the DAV prefix to get the relative path
-            if dav_prefix in href:
-                path = href.split(dav_prefix, 1)[1]
-            else:
-                path = href
-            path = path.rstrip("/")
+            path = (href.split(dav_prefix, 1)[1] if dav_prefix in href else href).rstrip("/")
 
             propstat = response.find(f"{{{DAV_NS}}}propstat")
             if propstat is None:
@@ -206,16 +228,10 @@ class NextcloudClient:
                     entry[key] = el.text
 
             # Convert size to int
-            if "size" in entry:
-                try:
-                    entry["size"] = int(entry["size"])
-                except (ValueError, TypeError):
-                    pass
-            if "total_size" in entry:
-                try:
-                    entry["total_size"] = int(entry["total_size"])
-                except (ValueError, TypeError):
-                    pass
+            for size_key in ("size", "total_size"):
+                if size_key in entry:
+                    with contextlib.suppress(ValueError, TypeError):
+                        entry[size_key] = int(entry[size_key])
 
             entries.append(entry)
 

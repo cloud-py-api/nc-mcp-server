@@ -1,10 +1,10 @@
 """Integration tests for file operations against a real Nextcloud instance."""
 
-from __future__ import annotations
+import contextlib
 
 import pytest
 
-from nextcloud_mcp.client import NextcloudClient
+from nextcloud_mcp.client import NextcloudClient, NextcloudError
 
 pytestmark = pytest.mark.integration
 
@@ -33,10 +33,8 @@ class TestFileOperations:
     async def test_full_lifecycle(self, nc_client: NextcloudClient) -> None:
         """Test create dir → upload file → read → move → delete."""
         # 1. Create test directory
-        try:
+        with contextlib.suppress(Exception):
             await nc_client.dav_mkcol(self.TEST_DIR)
-        except Exception:
-            pass  # May already exist
 
         # 2. Upload a file
         await nc_client.dav_put(
@@ -65,3 +63,10 @@ class TestFileOperations:
         # 7. Cleanup — delete file and directory
         await nc_client.dav_delete(moved_path)
         await nc_client.dav_delete(self.TEST_DIR)
+
+
+class TestErrorHandling:
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_file_raises(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match=r"Not found"):
+            await nc_client.dav_get("this-file-does-not-exist-12345.txt")

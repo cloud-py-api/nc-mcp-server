@@ -1,9 +1,8 @@
 """CLI entry point for the Nextcloud MCP server."""
 
-from __future__ import annotations
-
 import argparse
-import sys
+
+from .server import create_server
 
 
 def main() -> None:
@@ -15,8 +14,6 @@ def main() -> None:
         help="Transport mode: stdio (default, for local use) or http (for remote/container)",
     )
     args = parser.parse_args()
-
-    from .server import create_server
 
     mcp = create_server()
 
