@@ -1,11 +1,9 @@
 """MCP server — registers all tools and manages the Nextcloud client lifecycle."""
 
-from __future__ import annotations
-
 from mcp.server.fastmcp import FastMCP
 
-from .config import Config
 from .client import NextcloudClient
+from .config import Config
 from .permissions import set_permission_level
 
 # Global instances — initialized in create_server()
@@ -62,9 +60,13 @@ def create_server(config: Config | None = None) -> FastMCP:
 def _register_tools(mcp: FastMCP) -> None:
     """Import and register all tool modules."""
     # Import here to avoid circular imports — each module uses get_client()
-    from .tools import files  # noqa: F401
-    from .tools import users  # noqa: F401
+    from .tools import (
+        files,  # noqa: F401
+        notifications,  # noqa: F401
+        users,  # noqa: F401
+    )
 
     # Register tools from each module
     files.register(mcp)
+    notifications.register(mcp)
     users.register(mcp)
