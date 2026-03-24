@@ -33,4 +33,5 @@ jobs:
         with:
           files: coverage-unit.xml
           flags: unit,py${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

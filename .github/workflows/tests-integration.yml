@@ -74,6 +74,7 @@ jobs:
         with:
           files: coverage-integration.xml
           flags: integration,nc${{ matrix.nextcloud-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
       - name: Dump Nextcloud logs on failure
