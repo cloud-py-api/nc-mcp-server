@@ -56,11 +56,10 @@ jobs:
         run: pytest tests/ -v --ignore=tests/integration/ --cov=nextcloud_mcp --cov-report=xml:coverage-unit.xml
 
       - name: Upload unit test coverage
-        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           files: coverage-unit.xml
-          flags: unit
+          flags: unit,py${{ matrix.python-version }}
           fail_ci_if_error: false
 
   test-integration:
@@ -126,11 +125,10 @@ jobs:
         run: pytest tests/integration/ -v -m integration --cov=nextcloud_mcp --cov-report=xml:coverage-integration.xml
 
       - name: Upload integration test coverage
-        if: matrix.nextcloud-version == '33'
         uses: codecov/codecov-action@v5
         with:
           files: coverage-integration.xml
-          flags: integration
+          flags: integration,nc${{ matrix.nextcloud-version }}
           fail_ci_if_error: false
 
       - name: Dump Nextcloud logs on failure
