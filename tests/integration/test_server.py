@@ -63,7 +63,7 @@ class TestServerCreation:
     @pytest.mark.asyncio
     async def test_server_name(self, nc_config: Config) -> None:
         mcp = create_server(nc_config)
-        assert mcp.name == "nextcloud-mcp-server"
+        assert mcp.name == "nc-mcp-server"
 
     @pytest.mark.asyncio
     async def test_create_server_with_different_permissions(self) -> None:

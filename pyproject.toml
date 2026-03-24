@@ -3,7 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = [ "setuptools>=68" ]
 
 [project]
-name = "nextcloud-mcp-server"
+name = "nc-mcp-server"
 version = "0.1.0"
 description = "MCP server for Nextcloud — expose Nextcloud APIs as AI-usable tools"
 readme = "README.md"

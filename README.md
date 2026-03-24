@@ -1,9 +1,9 @@
 # Nextcloud MCP Server
 
-[![Lint](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/lint.yml/badge.svg)](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/lint.yml)
-[![Unit Tests](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/tests-unit.yml/badge.svg)](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/tests-unit.yml)
-[![Integration Tests](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/tests-integration.yml/badge.svg)](https://github.com/cloud-py-api/nextcloud-mcp-server/actions/workflows/tests-integration.yml)
-[![codecov](https://codecov.io/gh/cloud-py-api/nextcloud-mcp-server/graph/badge.svg)](https://codecov.io/gh/cloud-py-api/nextcloud-mcp-server)
+[![Lint](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/lint.yml/badge.svg)](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/lint.yml)
+[![Unit Tests](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-unit.yml/badge.svg)](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-unit.yml)
+[![Integration Tests](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml/badge.svg)](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml)
+[![codecov](https://codecov.io/gh/cloud-py-api/nc-mcp-server/graph/badge.svg)](https://codecov.io/gh/cloud-py-api/nc-mcp-server)
 
 ![PythonVersion](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)
 
@@ -35,13 +35,13 @@ If a tool is called without sufficient permission, it returns a clear error expl
 ## Installation
 
 ```bash
-pip install nextcloud-mcp-server
+pip install nc-mcp-server
 ```
 
 Or from source:
 ```bash
-git clone https://github.com/cloud-py-api/nextcloud-mcp-server.git
-cd nextcloud-mcp-server
+git clone https://github.com/cloud-py-api/nc-mcp-server.git
+cd nc-mcp-server
 pip install -e .
 ```
 
@@ -137,8 +137,8 @@ nextcloud-mcp
 
 ```bash
 # Clone and install
-git clone https://github.com/cloud-py-api/nextcloud-mcp-server.git
-cd nextcloud-mcp-server
+git clone https://github.com/cloud-py-api/nc-mcp-server.git
+cd nc-mcp-server
 python3 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
@@ -173,7 +173,3 @@ This project is an experiment in AI-autonomous open-source development. The enti
 - Resolving architectural questions
 
 The goal is to explore how far autonomous AI development can go in building production-quality, well-tested software.
-
-## License
-
-MIT

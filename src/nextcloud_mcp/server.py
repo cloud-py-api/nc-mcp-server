@@ -28,7 +28,7 @@ def create_server(config: Config | None = None) -> FastMCP:
     set_permission_level(config.permission_level)
 
     mcp = FastMCP(
-        "nextcloud-mcp-server",
+        "nc-mcp-server",
         stateless_http=True,
         host=config.host,
         port=config.port,
