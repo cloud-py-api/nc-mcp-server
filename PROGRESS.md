@@ -15,9 +15,9 @@
 - [x] Test suite overhaul: MCP tool-level integration tests (2026-03-21)
 - [x] Talk tools: list_conversations, get_conversation, get_messages, get_participants, send_message, create_conversation, delete_message, leave_conversation (2026-03-22)
 - [x] Talk polls: get_poll, create_poll, vote_poll, close_poll (2026-03-24)
+- [x] Activity tools: get_activity (2026-03-24)
 
 ### In Progress
-- [ ] Activity tools: get_activity
 - [ ] search_files tool (WebDAV SEARCH/REPORT)
 
 ### Blocked
@@ -46,8 +46,10 @@
 | Notifications | 3 | 11 |
 | Talk | 8 | 48 |
 | Talk Polls | 4 | 31 |
-| Server | — | 5 |
+| Activity | 1 | 16 |
+| Server | — | 6 |
 | Permissions | — | 34 |
 | Errors | — | 10 |
 | Config | — | 12 |
-| **Total** | **24** | **188** |
+| State | — | 2 |
+| **Total** | **25** | **208** |

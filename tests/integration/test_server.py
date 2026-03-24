@@ -17,6 +17,7 @@ EXPECTED_TOOLS = [
     "delete_message",
     "dismiss_all_notifications",
     "dismiss_notification",
+    "get_activity",
     "get_conversation",
     "get_current_user",
     "get_file",
