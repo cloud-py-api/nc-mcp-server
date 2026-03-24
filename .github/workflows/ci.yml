@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nextcloud-version: ["31", "32"]
+        nextcloud-version: ["32", "33"]
     services:
       nextcloud:
         image: nextcloud:${{ matrix.nextcloud-version }}
