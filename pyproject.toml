@@ -1,6 +1,5 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-
 requires = [ "setuptools>=68" ]
 
 [project]
@@ -20,12 +19,12 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
   "mcp[cli]>=1.20",
   "niquests>=3",
 ]
-
 optional-dependencies.dev = [
   "black",
   "isort",
@@ -38,8 +37,8 @@ optional-dependencies.dev = [
 ]
 scripts.nextcloud-mcp = "nextcloud_mcp.__main__:main"
 
-[tool.setuptools.packages.find]
-where = [ "src" ]
+[tool.setuptools]
+packages.find.where = [ "src" ]
 
 [tool.black]
 line-length = 120
@@ -78,13 +77,6 @@ lint.extend-per-file-ignores."tests/**/*.py" = [ "E402", "S", "UP" ]
 [tool.isort]
 profile = "black"
 
-[tool.pytest.ini_options]
-testpaths = [ "tests" ]
-asyncio_mode = "auto"
-markers = [
-  "integration: marks tests that require a running Nextcloud instance",
-]
-
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
@@ -92,3 +84,10 @@ venvPath = "."
 venv = "venv"
 reportUnusedFunction = false
 reportPrivateUsage = false
+
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.asyncio_mode = "auto"
+ini_options.markers = [
+  "integration: marks tests that require a running Nextcloud instance",
+]

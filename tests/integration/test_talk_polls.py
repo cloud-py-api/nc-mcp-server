@@ -362,6 +362,21 @@ class TestClosePoll:
         finally:
             await _delete_room(nc_mcp, str(room["token"]))
 
+    @pytest.mark.asyncio
+    async def test_close_public_poll_includes_voter_details(self, nc_mcp: McpTestHelper) -> None:
+        room = await _create_room(nc_mcp, "test-close-details")
+        try:
+            created = await _create_test_poll(nc_mcp, str(room["token"]), result_mode=0)
+            await nc_mcp.call("vote_poll", token=str(room["token"]), poll_id=int(created["id"]), option_ids=[0])
+            result = await nc_mcp.call("close_poll", token=str(room["token"]), poll_id=int(created["id"]))
+            poll = json.loads(result)
+            assert "details" in poll
+            assert isinstance(poll["details"], list)
+            assert len(poll["details"]) >= 1
+            assert poll["details"][0]["actorId"] == "admin"
+        finally:
+            await _delete_room(nc_mcp, str(room["token"]))
+
 
 class TestPollPermissions:
     @pytest.mark.asyncio
