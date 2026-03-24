@@ -39,14 +39,15 @@
 
 ## Test Coverage
 
-| Module | Tools | Integration Tests |
-|--------|-------|-------------------|
-| Files | 6 | 20 |
-| Users | 3 | 10 |
-| Notifications | 3 | 12 |
-| Talk | 8 | 44 |
+| Module | Tools | Tests |
+|--------|-------|-------|
+| Files | 6 | 24 |
+| Users | 3 | 13 |
+| Notifications | 3 | 11 |
+| Talk | 8 | 48 |
 | Talk Polls | 4 | 31 |
 | Server | — | 5 |
-| Permissions | — | 16 |
+| Permissions | — | 34 |
 | Errors | — | 10 |
-| **Total** | **24** | **158** |
+| Config | — | 12 |
+| **Total** | **24** | **188** |
