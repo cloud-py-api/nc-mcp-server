@@ -35,6 +35,7 @@ EXPECTED_TOOLS = [
     "list_notifications",
     "list_users",
     "move_file",
+    "search_files",
     "send_message",
     "upload_file",
     "vote_poll",

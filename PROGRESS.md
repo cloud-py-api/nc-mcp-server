@@ -18,8 +18,9 @@
 - [x] Activity tools: get_activity (2026-03-24)
 - [x] Comments tools: list_comments, add_comment, edit_comment, delete_comment (2026-03-24)
 
+- [x] search_files tool via WebDAV SEARCH (2026-03-24)
+
 ### In Progress
-- [ ] search_files tool (WebDAV SEARCH/REPORT)
 
 ### Blocked
 (none)
@@ -42,7 +43,7 @@
 
 | Module | Tools | Tests |
 |--------|-------|-------|
-| Files | 6 | 24 |
+| Files | 7 | 35 |
 | Users | 3 | 13 |
 | Notifications | 3 | 11 |
 | Talk | 8 | 48 |
@@ -54,4 +55,4 @@
 | Errors | — | 10 |
 | Config | — | 12 |
 | State | — | 2 |
-| **Total** | **29** | **235** |
+| **Total** | **30** | **250** |
