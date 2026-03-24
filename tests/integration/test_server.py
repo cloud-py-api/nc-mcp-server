@@ -71,3 +71,11 @@ class TestServerCreation:
             )
             mcp = create_server(config)
             assert len(mcp._tool_manager.list_tools()) == len(EXPECTED_TOOLS)
+
+    @pytest.mark.asyncio
+    async def test_create_server_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("NEXTCLOUD_URL", "http://nextcloud.ncmcp")
+        monkeypatch.setenv("NEXTCLOUD_USER", "admin")
+        monkeypatch.setenv("NEXTCLOUD_PASSWORD", "admin")
+        mcp = create_server()
+        assert len(mcp._tool_manager.list_tools()) == len(EXPECTED_TOOLS)
