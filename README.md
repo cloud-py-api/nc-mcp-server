@@ -5,6 +5,7 @@
 [![Integration Tests](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml/badge.svg)](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml)
 [![codecov](https://codecov.io/gh/cloud-py-api/nc-mcp-server/graph/badge.svg)](https://codecov.io/gh/cloud-py-api/nc-mcp-server)
 
+![PythonVersion](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)
 [![PyPI](https://img.shields.io/pypi/v/nc-mcp-server.svg)](https://pypi.org/project/nc-mcp-server/)
 [![Python](https://img.shields.io/pypi/implementation/nc-mcp-server)](https://pypi.org/project/nc-mcp-server/)
 
