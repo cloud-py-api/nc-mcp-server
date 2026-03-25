@@ -151,8 +151,8 @@ class TestGetActivity:
         assert since == max(a["activity_id"] for a in data)
         result2 = await nc_mcp.call("get_activity", sort="asc", limit=5, since=since)
         data2 = json.loads(result2)["data"]
-        if data2:
-            assert all(a["activity_id"] > since for a in data2)
+        assert len(data2) >= 1, "Paginating forward with since cursor should return more activities"
+        assert all(a["activity_id"] > since for a in data2)
 
     @pytest.mark.asyncio
     async def test_invalid_filter_raises(self, nc_mcp: McpTestHelper) -> None:
