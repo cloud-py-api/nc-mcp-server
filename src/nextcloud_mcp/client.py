@@ -228,7 +228,7 @@ class NextcloudClient:
             is_dir = resource_type is not None and resource_type.find(f"{{{DAV_NS}}}collection") is not None
 
             entry: dict[str, Any] = {
-                "path": path if path else "/",
+                "path": path or "/",
                 "is_directory": is_dir,
             }
 

@@ -5,7 +5,11 @@
 [![Integration Tests](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml/badge.svg)](https://github.com/cloud-py-api/nc-mcp-server/actions/workflows/tests-integration.yml)
 [![codecov](https://codecov.io/gh/cloud-py-api/nc-mcp-server/graph/badge.svg)](https://codecov.io/gh/cloud-py-api/nc-mcp-server)
 
+![NextcloudVersion](https://img.shields.io/badge/Nextcloud-32%20%7C%2033-blue)
 ![PythonVersion](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)
+[![Python](https://img.shields.io/pypi/implementation/nc-mcp-server)](https://pypi.org/project/nc-mcp-server/)
+[![PyPI](https://img.shields.io/pypi/v/nc-mcp-server.svg)](https://pypi.org/project/nc-mcp-server/)
+[![License: MIT](https://img.shields.io/github/license/cloud-py-api/nc-mcp-server)](https://github.com/cloud-py-api/nc-mcp-server/blob/main/LICENSE)
 
 > **Experimental** — This repository is fully maintained by AI (Claude). It serves as an experiment in autonomous AI-driven open-source development.
 
@@ -13,11 +17,12 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 ## Features
 
-- **File Management** — List, read, upload, move, and delete files via WebDAV
+- **File Management** — List, read, search, upload, move, and delete files via WebDAV
 - **User Info** — Get current user, list users, view user details
-- **Notifications** — List and dismiss notifications (coming soon)
-- **Activity Feed** — View recent activity (coming soon)
-- **Talk** — List conversations, read and send messages (coming soon)
+- **Notifications** — List and dismiss notifications
+- **Activity Feed** — View recent activity with filtering and pagination
+- **Talk** — List conversations, read and send messages, manage polls
+- **Comments** — List, add, edit, and delete file comments
 - **Security-First** — Granular permission levels control what AI can do
 
 ## Security: Permission Model
@@ -36,6 +41,13 @@ If a tool is called without sufficient permission, it returns a clear error expl
 
 ```bash
 pip install nc-mcp-server
+```
+
+Or with `pipx` / `uvx` for isolated installation:
+```bash
+pipx install nc-mcp-server
+# or
+uvx nc-mcp-server
 ```
 
 Or from source:
@@ -88,6 +100,17 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
+### With Claude Code
+
+```bash
+claude mcp add nextcloud \
+  -e NEXTCLOUD_URL=https://your-nextcloud.example.com \
+  -e NEXTCLOUD_USER=your-username \
+  -e NEXTCLOUD_PASSWORD=your-app-password \
+  -e NEXTCLOUD_MCP_PERMISSIONS=read \
+  -- nextcloud-mcp
+```
+
 ### As HTTP Server (for containers/remote)
 
 ```bash
@@ -104,18 +127,19 @@ nextcloud-mcp
 
 ## Available Tools
 
-### Files (Phase 1 — available now)
+### Files
 
 | Tool | Permission | Description |
 |------|-----------|-------------|
 | `list_directory(path)` | read | List files and folders |
 | `get_file(path)` | read | Read a file's content |
+| `search_files(name, mime_type, ...)` | read | Search files by name, type, or path |
 | `upload_file(path, content)` | write | Upload or overwrite a file |
 | `create_directory(path)` | write | Create a new directory |
 | `delete_file(path)` | destructive | Delete a file or directory |
 | `move_file(source, destination)` | destructive | Move or rename a file |
 
-### Users (Phase 1 — available now)
+### Users
 
 | Tool | Permission | Description |
 |------|-----------|-------------|
@@ -123,15 +147,60 @@ nextcloud-mcp
 | `list_users(search, limit)` | read | List/search users |
 | `get_user(user_id)` | read | Get specific user details |
 
+### Notifications
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_notifications()` | read | List all notifications |
+| `dismiss_notification(id)` | write | Dismiss a single notification |
+| `dismiss_all_notifications()` | write | Dismiss all notifications |
+
+### Activity
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `get_activity(filter, sort, limit, since)` | read | View recent activity with filtering and pagination |
+
+### Talk
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_conversations()` | read | List all Talk conversations |
+| `get_conversation(token)` | read | Get conversation details |
+| `get_messages(token, ...)` | read | Get messages from a conversation |
+| `get_participants(token)` | read | List participants in a conversation |
+| `send_message(token, message)` | write | Send a message to a conversation |
+| `create_conversation(name, ...)` | write | Create a new conversation |
+| `delete_message(token, id)` | destructive | Delete a message |
+| `leave_conversation(token)` | destructive | Leave a conversation |
+
+### Talk Polls
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `get_poll(token, poll_id)` | read | Get poll details and results |
+| `create_poll(token, question, options)` | write | Create a poll in a conversation |
+| `vote_poll(token, poll_id, options)` | write | Vote on a poll |
+| `close_poll(token, poll_id)` | write | Close a poll |
+
+### Comments
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_comments(path, ...)` | read | List comments on a file |
+| `add_comment(path, message)` | write | Add a comment to a file |
+| `edit_comment(path, comment_id, message)` | write | Edit a comment |
+| `delete_comment(path, comment_id)` | destructive | Delete a comment |
+
 ### Coming Soon
 
-- **Notifications** — list and dismiss
-- **Activity** — recent activity feed
-- **Talk** — conversations and messages
 - **Shares** — manage file shares
+- **Trashbin** — view and restore deleted files
+- **File Versions** — list and restore file versions
 - **Calendar** — events via CalDAV
 - **Contacts** — contacts via CardDAV
 - **Deck** — boards and cards
+- **Notes** — manage notes
 
 ## Development
 
@@ -162,7 +231,7 @@ export NEXTCLOUD_PASSWORD=admin
 pytest tests/integration/ -v -m integration
 ```
 
-CI automatically runs integration tests against a fresh Nextcloud Docker container.
+CI automatically runs integration tests against Nextcloud 32 and 33 Docker containers.
 
 ## About This Project
 
