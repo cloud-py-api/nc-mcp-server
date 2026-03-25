@@ -144,14 +144,16 @@ class NextcloudClient:
         text = response.text or ""
         return self._parse_propfind(text, user)
 
-    async def dav_get(self, path: str) -> bytes:
-        """GET a file's content via WebDAV."""
+    async def dav_get(self, path: str) -> tuple[bytes, str]:
+        """GET a file's content via WebDAV. Returns (content, content_type)."""
         session = await self._get_session()
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.get(url)
         _raise_for_status(response, f"Get file '{path}'")
-        return response.content or b""
+        ct = response.headers.get("content-type", "application/octet-stream")
+        content_type = str(ct).split(";")[0].strip()
+        return response.content or b"", content_type
 
     async def dav_put(self, path: str, content: bytes, content_type: str = "application/octet-stream") -> None:
         """PUT (upload/overwrite) a file via WebDAV."""
@@ -176,6 +178,19 @@ class NextcloudClient:
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await session.request("MKCOL", url)
         _raise_for_status(response, f"Create directory '{path}'")
+
+    async def dav_copy(self, source: str, destination: str) -> None:
+        """COPY a file or folder via WebDAV."""
+        session = await self._get_session()
+        user = self._config.user
+        src_url = f"{self._base_url}/remote.php/dav/files/{user}/{source.lstrip('/')}"
+        dest_url = f"{self._base_url}/remote.php/dav/files/{user}/{destination.lstrip('/')}"
+        response = await session.request(
+            "COPY",
+            src_url,
+            headers={"Destination": dest_url, "Overwrite": "F"},
+        )
+        _raise_for_status(response, f"Copy '{source}' to '{destination}'")
 
     async def dav_move(self, source: str, destination: str) -> None:
         """MOVE a file or folder via WebDAV."""

@@ -4,6 +4,7 @@ Tests call MCP tools by name, not the raw client, to exercise the full
 tool stack including permission checks, argument parsing, and JSON serialization.
 """
 
+import base64
 import json
 from typing import Any
 
@@ -11,6 +12,10 @@ import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
 from .conftest import TEST_BASE_DIR, McpTestHelper
+
+# 1x1 red pixel PNG (70 bytes)
+_TINY_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg=="
+_TINY_PNG = base64.b64decode(_TINY_PNG_B64)
 
 pytestmark = pytest.mark.integration
 
@@ -102,7 +107,7 @@ class TestGetFile:
 
         result = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/binary.bin")
         assert "Binary file" in result
-        assert "256 bytes" in result
+        assert "application/" in result
 
 
 class TestUploadFile:
@@ -343,3 +348,116 @@ class TestSearchFiles:
         result = await nc_mcp_read_only.call("search_files", query="anything")
         data = json.loads(result)["data"]
         assert isinstance(data, list)
+
+
+class TestGetFileImageHandling:
+    @pytest.mark.asyncio
+    async def test_image_returns_image_content(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.client.dav_put(f"{TEST_BASE_DIR}/test.png", _TINY_PNG, content_type="image/png")
+        result = await nc_mcp.mcp._tool_manager.call_tool("get_file", {"path": f"{TEST_BASE_DIR}/test.png"})
+        assert isinstance(result, list)
+        item = result[0]  # type: ignore[index]
+        assert item.type == "image"  # type: ignore[union-attr]
+        assert item.mimeType == "image/png"  # type: ignore[union-attr]
+        assert len(item.data) > 0  # type: ignore[union-attr]
+
+    @pytest.mark.asyncio
+    async def test_text_file_returns_text(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/hello.txt", "hello world")
+        result = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/hello.txt")
+        assert result == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_binary_non_image_returns_metadata(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.client.dav_put(
+            f"{TEST_BASE_DIR}/data.bin", b"\x00\x01\x02\xff" * 100, content_type="application/octet-stream"
+        )
+        result = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/data.bin")
+        assert "Binary file" in result
+        assert "application/" in result
+
+    @pytest.mark.asyncio
+    async def test_large_image_returns_metadata(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        large_data = _TINY_PNG + b"\x00" * (11 * 1024 * 1024)
+        await nc_mcp.client.dav_put(f"{TEST_BASE_DIR}/huge.png", large_data, content_type="image/png")
+        result = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/huge.png")
+        assert "Binary file" in result
+
+    @pytest.mark.asyncio
+    async def test_jpeg_returns_image_content(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        jpeg_data = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+        await nc_mcp.client.dav_put(f"{TEST_BASE_DIR}/test.jpg", jpeg_data, content_type="image/jpeg")
+        result = await nc_mcp.mcp._tool_manager.call_tool("get_file", {"path": f"{TEST_BASE_DIR}/test.jpg"})
+        assert isinstance(result, list)
+        item = result[0]  # type: ignore[index]
+        assert item.type == "image"  # type: ignore[union-attr]
+        assert item.mimeType == "image/jpeg"  # type: ignore[union-attr]
+
+
+class TestCopyFile:
+    @pytest.mark.asyncio
+    async def test_copy_file(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/original.txt", "original content")
+        result = await nc_mcp.call(
+            "copy_file", source=f"{TEST_BASE_DIR}/original.txt", destination=f"{TEST_BASE_DIR}/copy.txt"
+        )
+        assert "Copied" in result
+        original = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/original.txt")
+        assert original == "original content"
+        copy = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/copy.txt")
+        assert copy == "original content"
+
+    @pytest.mark.asyncio
+    async def test_copy_directory(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.create_test_dir(f"{TEST_BASE_DIR}/src-dir")
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/src-dir/file.txt", "inside dir")
+        result = await nc_mcp.call(
+            "copy_file", source=f"{TEST_BASE_DIR}/src-dir", destination=f"{TEST_BASE_DIR}/dst-dir"
+        )
+        assert "Copied" in result
+        copy = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/dst-dir/file.txt")
+        assert copy == "inside dir"
+
+    @pytest.mark.asyncio
+    async def test_copy_source_not_found(self, nc_mcp: McpTestHelper) -> None:
+        with pytest.raises(ToolError):
+            await nc_mcp.call(
+                "copy_file", source=f"{TEST_BASE_DIR}/nonexistent.txt", destination=f"{TEST_BASE_DIR}/dest.txt"
+            )
+
+    @pytest.mark.asyncio
+    async def test_copy_destination_exists_fails(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/src.txt", "source")
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/dst.txt", "destination")
+        with pytest.raises(ToolError):
+            await nc_mcp.call("copy_file", source=f"{TEST_BASE_DIR}/src.txt", destination=f"{TEST_BASE_DIR}/dst.txt")
+
+    @pytest.mark.asyncio
+    async def test_copy_preserves_source(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/keep.txt", "keep me")
+        await nc_mcp.call("copy_file", source=f"{TEST_BASE_DIR}/keep.txt", destination=f"{TEST_BASE_DIR}/kept.txt")
+        source = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/keep.txt")
+        assert source == "keep me"
+
+    @pytest.mark.asyncio
+    async def test_copy_read_only_blocked(self, nc_mcp_read_only: McpTestHelper) -> None:
+        with pytest.raises(ToolError, match=r"[Pp]ermission"):
+            await nc_mcp_read_only.call("copy_file", source="a.txt", destination="b.txt")
+
+    @pytest.mark.asyncio
+    async def test_copy_write_allowed(self, nc_mcp_write: McpTestHelper) -> None:
+        await nc_mcp_write.create_test_dir()
+        await nc_mcp_write.client.dav_put(f"{TEST_BASE_DIR}/w-src.txt", b"write test", content_type="text/plain")
+        result = await nc_mcp_write.call(
+            "copy_file", source=f"{TEST_BASE_DIR}/w-src.txt", destination=f"{TEST_BASE_DIR}/w-dst.txt"
+        )
+        assert "Copied" in result

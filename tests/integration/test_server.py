@@ -12,6 +12,7 @@ EXPECTED_TOOLS = [
     "add_comment",
     "clear_user_status",
     "close_poll",
+    "copy_file",
     "create_conversation",
     "create_directory",
     "create_poll",

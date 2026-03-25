@@ -1,9 +1,11 @@
-"""File management tools — list, read, upload, delete, move, search files via WebDAV."""
+"""File management tools — list, read, upload, copy, delete, move, search files via WebDAV."""
 
+import base64
 import json
 from xml.sax.saxutils import escape as xml_escape
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ImageContent, TextContent
 
 from ..annotations import (
     ADDITIVE_IDEMPOTENT,
@@ -14,6 +16,9 @@ from ..annotations import (
 from ..client import NextcloudClient
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client, get_config
+
+_IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
+_MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
 
 def _build_search_xml(user: str, query: str, path: str, limit: int, offset: int, mimetype: str) -> str:
@@ -75,24 +80,30 @@ def _register_read_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def get_file(path: str) -> str:
+    async def get_file(path: str) -> list[TextContent | ImageContent]:
         """Read a file's content from Nextcloud.
 
-        Best for text files (txt, md, json, csv, xml, etc.).
-        For binary files, returns a message with the file size instead.
+        Text files are returned as text. Image files (PNG, JPEG, GIF, WebP)
+        are returned as viewable images. Other binary files return metadata.
 
         Args:
             path: File path relative to user's root. Example: "Documents/notes.md"
 
         Returns:
-            The file content as text, or a description for binary files.
+            File content as text, an image, or metadata for unsupported binary files.
         """
         client = get_client()
-        content = await client.dav_get(path)
+        content, content_type = await client.dav_get(path)
+        ct = content_type.lower()
+        if ct in _IMAGE_MIME_TYPES and len(content) <= _MAX_IMAGE_SIZE:
+            data = base64.b64encode(content).decode("ascii")
+            return [ImageContent(type="image", data=data, mimeType=ct)]
         try:
-            return content.decode("utf-8")
+            return [TextContent(type="text", text=content.decode("utf-8"))]
         except UnicodeDecodeError:
-            return f"[Binary file, {len(content)} bytes. Use download tools for binary content.]"
+            size_kb = len(content) / 1024
+            msg = f"[Binary file: {size_kb:.1f} KB, type: {ct}. Cannot display binary content.]"
+            return [TextContent(type="text", text=msg)]
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
@@ -168,6 +179,25 @@ def _register_write_tools(mcp: FastMCP) -> None:
         client = get_client()
         await client.dav_put(path, content.encode("utf-8"), content_type="text/plain; charset=utf-8")
         return f"File uploaded successfully: {path}"
+
+    @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
+    @require_permission(PermissionLevel.WRITE)
+    async def copy_file(source: str, destination: str) -> str:
+        """Copy a file or directory in Nextcloud.
+
+        Creates a copy at the destination path. The source remains unchanged.
+        Fails if the destination already exists.
+
+        Args:
+            source: Source path. Example: "Documents/report.md"
+            destination: Destination path. Example: "Documents/report-backup.md"
+
+        Returns:
+            Confirmation message.
+        """
+        client = get_client()
+        await client.dav_copy(source, destination)
+        return f"Copied: {source} → {destination}"
 
     @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
     @require_permission(PermissionLevel.WRITE)

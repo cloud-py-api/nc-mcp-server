@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ImageContent, TextContent
 
 from nextcloud_mcp.client import NextcloudClient
 from nextcloud_mcp.config import Config
@@ -29,7 +30,16 @@ class McpTestHelper:
     async def call(self, tool_name: str, **kwargs: object) -> str:
         """Call an MCP tool by name and return its string result."""
         result = await self.mcp._tool_manager.call_tool(tool_name, dict(kwargs))
-        return str(result)
+        if not isinstance(result, list):
+            return str(result)
+        items: list[TextContent | ImageContent] = result  # type: ignore[assignment]
+        parts: list[str] = []
+        for item in items:
+            if isinstance(item, TextContent):
+                parts.append(item.text)
+            else:
+                parts.append(f"[Image: {item.mimeType}]")
+        return parts[0] if len(parts) == 1 else "\n".join(parts)
 
     def tool_names(self) -> list[str]:
         """Return sorted list of all registered tool names."""
