@@ -10,6 +10,7 @@ pytestmark = pytest.mark.integration
 
 EXPECTED_TOOLS = [
     "add_comment",
+    "clear_user_status",
     "close_poll",
     "create_conversation",
     "create_directory",
@@ -28,6 +29,7 @@ EXPECTED_TOOLS = [
     "get_participants",
     "get_poll",
     "get_user",
+    "get_user_status",
     "leave_conversation",
     "list_comments",
     "list_conversations",
@@ -37,6 +39,7 @@ EXPECTED_TOOLS = [
     "move_file",
     "search_files",
     "send_message",
+    "set_user_status",
     "upload_file",
     "vote_poll",
 ]

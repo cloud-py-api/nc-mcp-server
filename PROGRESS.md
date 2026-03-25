@@ -19,6 +19,7 @@
 - [x] Comments tools: list_comments, add_comment, edit_comment, delete_comment (2026-03-24)
 
 - [x] search_files tool via WebDAV SEARCH (2026-03-24)
+- [x] User Status tools: get_user_status, set_user_status, clear_user_status (2026-03-25)
 
 ### In Progress
 
@@ -50,9 +51,10 @@
 | Talk Polls | 4 | 32 |
 | Activity | 1 | 18 |
 | Comments | 4 | 29 |
+| User Status | 3 | 19 |
 | Server | — | 6 |
 | Permissions | — | 34 |
 | Errors | — | 10 |
 | Config | — | 12 |
 | State | — | 2 |
-| **Total** | **30** | **250** |
+| **Total** | **33** | **271** |
