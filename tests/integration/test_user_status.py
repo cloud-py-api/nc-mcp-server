@@ -45,11 +45,11 @@ class TestGetUserStatus:
         """A fresh user who never set a status gets a 404 from the API.
         The tool should handle this gracefully and return a default offline status."""
         try:
-            await nc_mcp.call("create_user", user_id="mcp-fresh-status", password="TestPass123!")
+            await nc_mcp.call("create_user", user_id="mcp-fresh-status", password="t3St*Pw!xQ9#mK2z")
             fresh_config = Config(
                 nextcloud_url=nc_mcp.client._base_url,
                 user="mcp-fresh-status",
-                password="TestPass123!",
+                password="t3St*Pw!xQ9#mK2z",
                 permission_level=nc_mcp.client._config.permission_level,
             )
             fresh_mcp = create_server(fresh_config)
