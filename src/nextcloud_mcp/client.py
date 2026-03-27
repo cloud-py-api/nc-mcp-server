@@ -282,6 +282,37 @@ class NextcloudClient:
         response = await session.request("MOVE", src, headers={"Destination": dest})
         _raise_for_status(response, f"Restore '{trash_path}'")
 
+    async def versions_propfind(self, file_id: int) -> str:
+        """PROPFIND on the versions collection for a file. Returns raw XML text."""
+        session = await self._get_session()
+        user = self._config.user
+        url = f"{self._base_url}/remote.php/dav/versions/{user}/versions/{file_id}/"
+        body = (
+            '<?xml version="1.0"?>'
+            '<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">'
+            "<d:prop>"
+            "<d:getlastmodified/><d:getcontentlength/><d:getcontenttype/>"
+            "<nc:version-author/><nc:version-label/>"
+            "</d:prop></d:propfind>"
+        )
+        response = await session.request(
+            "PROPFIND",
+            url,
+            data=body,
+            headers={"Depth": "1", "Content-Type": "application/xml; charset=utf-8"},
+        )
+        _raise_for_status(response, f"List versions for file {file_id}")
+        return response.text or ""
+
+    async def versions_restore(self, file_id: int, version_id: str) -> None:
+        """Restore a file version by MOVEing it to the restore folder."""
+        session = await self._get_session()
+        user = self._config.user
+        src = f"{self._base_url}/remote.php/dav/versions/{user}/versions/{file_id}/{version_id}"
+        dest = f"{self._base_url}/remote.php/dav/versions/{user}/restore/target"
+        response = await session.request("MOVE", src, headers={"Destination": dest})
+        _raise_for_status(response, f"Restore version '{version_id}' of file {file_id}")
+
     async def trashbin_delete(self, trash_path: str = "") -> None:
         """Delete a single item or empty the entire trash (if path is empty)."""
         session = await self._get_session()

@@ -28,6 +28,7 @@
 - [x] OCS error message extraction: surface Nextcloud error messages instead of generic HTTP codes (2026-03-27)
 - [x] Announcement Center tools: list_announcements, create_announcement, delete_announcement (2026-03-27)
 - [x] Files Trashbin tools: list_trash, restore_trash_item, empty_trash (2026-03-27)
+- [x] Files Versions tools: list_versions, restore_version (2026-03-27)
 
 ### In Progress
 
@@ -35,7 +36,7 @@
 (none)
 
 ### Next Up
-- Files Versions
+- Phase 3 — Groupware (Calendar, Contacts, Tasks, Deck, Notes, Mail)
 
 ## Phases
 
@@ -60,6 +61,7 @@
 | User Status | 3 | 19 |
 | Announcements | 3 | 29 |
 | Trashbin | 3 | 22 |
+| Versions | 2 | 18 |
 | Shares | 5 | 40 |
 | System Tags | 6 | 22 |
 | Server | — | 7 |
@@ -68,4 +70,4 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **53** | **444** |
+| **Total** | **55** | **462** |
