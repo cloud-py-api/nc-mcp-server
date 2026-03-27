@@ -18,6 +18,7 @@ from .tools import (
     trashbin,
     user_status,
     users,
+    versions,
 )
 
 __all__ = ["create_server", "get_client", "get_config"]
@@ -56,6 +57,7 @@ def create_server(config: Config | None = None) -> FastMCP:
     talk.register(mcp)
     trashbin.register(mcp)
     user_status.register(mcp)
+    versions.register(mcp)
     users.register(mcp)
 
     return mcp
