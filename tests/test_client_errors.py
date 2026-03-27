@@ -6,7 +6,7 @@ from typing import Any
 import niquests
 import pytest
 
-from nextcloud_mcp.client import (
+from nc_mcp_server.client import (
     NextcloudError,
     _raise_for_ocs_status,
     _raise_for_status,

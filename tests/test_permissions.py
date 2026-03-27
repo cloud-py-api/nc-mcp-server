@@ -2,7 +2,7 @@
 
 import pytest
 
-from nextcloud_mcp.permissions import (
+from nc_mcp_server.permissions import (
     PermissionDeniedError,
     PermissionLevel,
     require_permission,

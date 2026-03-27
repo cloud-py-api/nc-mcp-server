@@ -35,7 +35,7 @@ optional-dependencies.dev = [
   "pytest-cov>=6",
   "ruff>=0.8",
 ]
-scripts.nextcloud-mcp = "nextcloud_mcp.__main__:main"
+scripts.nc-mcp-server = "nc_mcp_server.__main__:main"
 
 [tool.setuptools]
 packages.find.where = [ "src" ]
@@ -92,8 +92,8 @@ lint.extend-ignore = [
   "SIM117",
   "TRY003",
 ]
-lint.extend-per-file-ignores."src/nextcloud_mcp/client.py" = [ "S314" ]
-lint.extend-per-file-ignores."src/nextcloud_mcp/config.py" = [ "S104" ]
+lint.extend-per-file-ignores."src/nc_mcp_server/client.py" = [ "S314" ]
+lint.extend-per-file-ignores."src/nc_mcp_server/config.py" = [ "S104" ]
 lint.extend-per-file-ignores."tests/**/*.py" = [ "E402", "S", "UP" ]
 
 [tool.isort]

@@ -2,8 +2,8 @@
 
 import pytest
 
-from nextcloud_mcp.config import Config
-from nextcloud_mcp.permissions import PermissionLevel
+from nc_mcp_server.config import Config
+from nc_mcp_server.permissions import PermissionLevel
 
 
 class TestConfigFromEnv:

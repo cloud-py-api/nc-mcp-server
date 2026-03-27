@@ -2,8 +2,8 @@
 
 import pytest
 
-from nextcloud_mcp.client import NextcloudClient
-from nextcloud_mcp.config import Config
+from nc_mcp_server.client import NextcloudClient
+from nc_mcp_server.config import Config
 
 
 def _make_config(retry_max: int = 3) -> Config:

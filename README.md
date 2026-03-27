@@ -89,7 +89,7 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "nextcloud": {
-      "command": "nextcloud-mcp",
+      "command": "nc-mcp-server",
       "env": {
         "NEXTCLOUD_URL": "https://your-nextcloud.example.com",
         "NEXTCLOUD_USER": "your-username",
@@ -109,20 +109,20 @@ claude mcp add nextcloud \
   -e NEXTCLOUD_USER=your-username \
   -e NEXTCLOUD_PASSWORD=your-app-password \
   -e NEXTCLOUD_MCP_PERMISSIONS=read \
-  -- nextcloud-mcp
+  -- nc-mcp-server
 ```
 
 ### As HTTP Server (for containers/remote)
 
 ```bash
-nextcloud-mcp --transport http
+nc-mcp-server --transport http
 # Listens on http://0.0.0.0:8100 by default
 ```
 
 ### Stdio Mode (default)
 
 ```bash
-nextcloud-mcp
+nc-mcp-server
 # Communicates via stdin/stdout — used by MCP clients like Claude Desktop
 ```
 

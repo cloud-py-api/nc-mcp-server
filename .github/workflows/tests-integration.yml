@@ -70,7 +70,7 @@ jobs:
           NEXTCLOUD_URL: http://localhost:8080
           NEXTCLOUD_USER: admin
           NEXTCLOUD_PASSWORD: admin
-        run: pytest tests/integration/ -v -m integration --cov=nextcloud_mcp --cov-report=xml:coverage-integration.xml
+        run: pytest tests/integration/ -v -m integration --cov=nc_mcp_server --cov-report=xml:coverage-integration.xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5

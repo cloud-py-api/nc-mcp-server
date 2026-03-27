@@ -8,11 +8,11 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent, TextContent
 
-from nextcloud_mcp.client import NextcloudClient
-from nextcloud_mcp.config import Config
-from nextcloud_mcp.permissions import PermissionLevel
-from nextcloud_mcp.server import create_server
-from nextcloud_mcp.state import get_client
+from nc_mcp_server.client import NextcloudClient
+from nc_mcp_server.config import Config
+from nc_mcp_server.permissions import PermissionLevel
+from nc_mcp_server.server import create_server
+from nc_mcp_server.state import get_client
 
 pytestmark = pytest.mark.integration
 

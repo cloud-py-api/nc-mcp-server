@@ -2,8 +2,8 @@
 
 import pytest
 
-import nextcloud_mcp.state as state_module
-from nextcloud_mcp.state import get_client, get_config
+import nc_mcp_server.state as state_module
+from nc_mcp_server.state import get_client, get_config
 
 
 class TestStateNotInitialized:

@@ -7,7 +7,7 @@ rather than raw HTTP status codes or stack traces.
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
-from nextcloud_mcp.client import NextcloudClient, NextcloudError
+from nc_mcp_server.client import NextcloudClient, NextcloudError
 
 from .conftest import TEST_BASE_DIR, McpTestHelper
 

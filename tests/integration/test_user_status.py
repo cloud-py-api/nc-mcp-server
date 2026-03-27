@@ -6,9 +6,9 @@ import json
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
-from nextcloud_mcp.config import Config
-from nextcloud_mcp.server import create_server
-from nextcloud_mcp.state import get_client
+from nc_mcp_server.config import Config
+from nc_mcp_server.server import create_server
+from nc_mcp_server.state import get_client
 
 from .conftest import McpTestHelper
 
