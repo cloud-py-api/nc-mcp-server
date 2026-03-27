@@ -18,20 +18,46 @@ class NextcloudError(Exception):
         super().__init__(message)
 
 
+_STATUS_MESSAGES: dict[int, str] = {
+    401: "Authentication failed. Check NEXTCLOUD_USER and NEXTCLOUD_PASSWORD.",
+    403: "Forbidden. The user does not have permission for this operation.",
+    404: "Not found.",
+    409: "Conflict. The resource may already exist or the parent directory is missing.",
+    423: "Locked. The resource is currently locked by another process.",
+}
+
+
 def _raise_for_status(response: niquests.Response, context: str = "") -> None:
     """Raise NextcloudError with a helpful message instead of raw HTTPError."""
     if response.ok:
         return
     code = response.status_code or 0
     prefix = f"{context}: " if context else ""
-    messages: dict[int, str] = {
-        401: "Authentication failed. Check NEXTCLOUD_USER and NEXTCLOUD_PASSWORD.",
-        403: "Forbidden. The user does not have permission for this operation.",
-        404: "Not found.",
-        409: "Conflict. The resource may already exist or the parent directory is missing.",
-        423: "Locked. The resource is currently locked by another process.",
-    }
-    detail = messages.get(code, f"HTTP {code}")
+    detail = _STATUS_MESSAGES.get(code, f"HTTP {code}")
+    raise NextcloudError(f"{prefix}{detail}", code)
+
+
+def _raise_for_ocs_status(response: niquests.Response, context: str = "") -> None:
+    """Raise NextcloudError using the OCS error message from the response body when available.
+
+    Nextcloud OCS endpoints return error details in ocs.meta.message (e.g.
+    "User already exists", "Wrong share ID, share does not exist"). This
+    function extracts that message for a much better error experience than
+    the generic HTTP status code mapping.
+
+    Falls back to _raise_for_status() when the OCS body cannot be parsed.
+    """
+    if response.ok:
+        return
+    code = response.status_code or 0
+    prefix = f"{context}: " if context else ""
+    try:
+        ocs_message: str = response.json()["ocs"]["meta"]["message"]
+        if ocs_message:
+            raise NextcloudError(f"{prefix}{ocs_message}", code)
+    except (ValueError, KeyError, TypeError):
+        pass
+    detail = _STATUS_MESSAGES.get(code, f"HTTP {code}")
     raise NextcloudError(f"{prefix}{detail}", code)
 
 
@@ -108,7 +134,7 @@ class NextcloudClient:
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.get(url, params=params or {})
-        _raise_for_status(response, f"OCS GET {path}")
+        _raise_for_ocs_status(response, f"OCS GET {path}")
         result: dict[str, Any] = response.json()  # type: ignore[assignment]
         return result["ocs"]["data"]
 
@@ -117,7 +143,7 @@ class NextcloudClient:
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.post(url, data=data or {})
-        _raise_for_status(response, f"OCS POST {path}")
+        _raise_for_ocs_status(response, f"OCS POST {path}")
         result: dict[str, Any] = response.json()  # type: ignore[assignment]
         return result["ocs"]["data"]
 
@@ -126,7 +152,7 @@ class NextcloudClient:
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.put(url, data=data or {})
-        _raise_for_status(response, f"OCS PUT {path}")
+        _raise_for_ocs_status(response, f"OCS PUT {path}")
         result: dict[str, Any] = response.json()  # type: ignore[assignment]
         return result["ocs"]["data"]
 
@@ -135,7 +161,7 @@ class NextcloudClient:
         session = await self._get_session()
         url = f"{self._base_url}/ocs/v2.php/{path}"
         response = await session.delete(url)
-        _raise_for_status(response, f"OCS DELETE {path}")
+        _raise_for_ocs_status(response, f"OCS DELETE {path}")
         result: dict[str, Any] = response.json()  # type: ignore[assignment]
         return result["ocs"]["data"]
 

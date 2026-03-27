@@ -59,6 +59,45 @@ class TestNextcloudErrorMessages:
         assert exc_info.value.status_code > 0
 
 
+class TestOcsErrorMessages:
+    """Verify that OCS error messages from Nextcloud are extracted, not discarded."""
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_user_includes_ocs_message(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match="User does not exist") as exc_info:
+            await nc_client.ocs_get("cloud/users/nonexistent-user-xyz-12345")
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_share_includes_ocs_message(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match="Wrong share ID, share does not exist") as exc_info:
+            await nc_client.ocs_get("apps/files_sharing/api/v1/shares/999999")
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_share_nonexistent_path_includes_ocs_message(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match="Wrong path") as exc_info:
+            await nc_client.ocs_post(
+                "apps/files_sharing/api/v1/shares",
+                data={"path": "/nonexistent-xyz-12345.txt", "shareType": 3},
+            )
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_create_duplicate_user_includes_ocs_message(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError, match="already exists") as exc_info:
+            await nc_client.ocs_post("cloud/users", data={"userid": "admin", "password": "test"})
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_ocs_error_preserves_context_prefix(self, nc_client: NextcloudClient) -> None:
+        with pytest.raises(NextcloudError) as exc_info:
+            await nc_client.ocs_get("cloud/users/nonexistent-user-xyz-12345")
+        msg = str(exc_info.value)
+        assert "OCS GET" in msg
+        assert "User does not exist" in msg
+
+
 class TestErrorsThroughMcpTools:
     """Verify that errors propagate correctly through the MCP tool layer."""
 
@@ -78,6 +117,11 @@ class TestErrorsThroughMcpTools:
             await nc_mcp.call("delete_file", path="nonexistent-12345.txt")
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_user_via_tool(self, nc_mcp: McpTestHelper) -> None:
-        with pytest.raises(ToolError):
+    async def test_get_nonexistent_user_ocs_message_via_tool(self, nc_mcp: McpTestHelper) -> None:
+        with pytest.raises(ToolError, match="User does not exist"):
             await nc_mcp.call("get_user", user_id="nonexistent-user-xyz-12345")
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_share_ocs_message_via_tool(self, nc_mcp: McpTestHelper) -> None:
+        with pytest.raises(ToolError, match="Wrong share ID"):
+            await nc_mcp.call("get_share", share_id=999999)
