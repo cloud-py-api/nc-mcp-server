@@ -146,15 +146,13 @@ def _register_read_tools(mcp: FastMCP) -> None:
             params["cursor"] = str(cursor)
         data = await client.ocs_get(f"{MAIL_OCS}/ocs/mailboxes/{mailbox_id}/messages", params=params)
         messages = [_format_message_summary(m) for m in data]
-        result: dict[str, Any] = {
-            "data": messages,
-            "pagination": {
-                "count": len(messages),
-                "has_more": len(messages) == limit,
-            },
+        pagination: dict[str, Any] = {
+            "count": len(messages),
+            "has_more": len(messages) == limit,
         }
-        if cursor is not None:
-            result["pagination"]["cursor"] = cursor
+        if messages:
+            pagination["next_cursor"] = min(m["id"] for m in messages)
+        result: dict[str, Any] = {"data": messages, "pagination": pagination}
         return json.dumps(result, indent=2)
 
     @mcp.tool(annotations=READONLY)
@@ -162,7 +160,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
     async def get_mail_message(message_id: int) -> str:
         """Get a full email message including its body.
 
-        Retrieves the complete message with headers, body text, and attachment metadata.
+        Retrieves the complete message with body text, message ID, and attachment metadata.
 
         Args:
             message_id: The message database ID. Use list_mail_messages to find it.

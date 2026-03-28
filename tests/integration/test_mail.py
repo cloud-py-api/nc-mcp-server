@@ -64,11 +64,14 @@ def _sync_mail_account(account_id: int) -> None:
 
 
 async def _get_account_id(nc_mcp: McpTestHelper) -> int:
-    """Get the first mail account ID."""
+    """Get the test mail account ID, preferring MAIL_RECIPIENT match."""
     result = await nc_mcp.call("list_mail_accounts")
-    accounts = json.loads(result)
+    accounts: list[dict[str, Any]] = json.loads(result)
     if not accounts:
         pytest.skip("No mail account configured")
+    for a in accounts:
+        if MAIL_RECIPIENT.endswith(a["email"].split("@")[-1]):
+            return a["id"]
     return accounts[0]["id"]
 
 
