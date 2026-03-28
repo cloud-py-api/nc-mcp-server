@@ -1,4 +1,12 @@
-"""Integration tests for Mail tools against a real Nextcloud instance with smtp4dev."""
+"""Integration tests for Mail tools against a real Nextcloud instance with smtp4dev.
+
+These tests require:
+1. The Nextcloud Mail app with OCS API support (NC 34+ or recent Mail app)
+2. A smtp4dev container accessible at smtp4dev.ncmcp with IMAP (143) and SMTP (25)
+3. A pre-configured mail account via: occ mail:account:create admin "Test Mail" test@smtp4dev.ncmcp ...
+
+Tests are automatically skipped when the Mail OCS API is not available.
+"""
 
 import asyncio
 import json
@@ -21,6 +29,24 @@ SMTP_HOST = "smtp4dev.ncmcp"
 SMTP_PORT = 25
 MAIL_RECIPIENT = "test@smtp4dev.ncmcp"
 UNIQUE = "mcp-test-mail"
+
+_mail_api_checked = False
+_mail_api_available = False
+
+
+@pytest.fixture(autouse=True)
+async def _skip_without_mail_api(nc_mcp: McpTestHelper) -> None:
+    """Skip all mail tests when the Mail OCS API is not available."""
+    global _mail_api_checked, _mail_api_available
+    if not _mail_api_checked:
+        _mail_api_checked = True
+        try:
+            await nc_mcp.call("list_mail_accounts")
+            _mail_api_available = True
+        except ToolError:
+            _mail_api_available = False
+    if not _mail_api_available:
+        pytest.skip("Mail OCS API not available (requires NC 34+ or recent Mail app)")
 
 
 def _smtp4dev_delete_all() -> None:
