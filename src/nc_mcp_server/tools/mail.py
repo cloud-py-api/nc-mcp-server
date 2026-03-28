@@ -166,8 +166,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
             message_id: The message database ID. Use list_mail_messages to find it.
 
         Returns:
-            JSON object with: id, subject, date, from, to, cc, bcc, body (text content),
-            flags, and attachments list (if any).
+            JSON object with: id, subject, date, from, to, cc, bcc, message_id,
+            body, flags, and attachments list (if any).
         """
         client = get_client()
         data = await client.ocs_get(f"{MAIL_OCS}/message/{message_id}")
