@@ -48,17 +48,19 @@ def _send_test_email(subject: str, body: str = "test body", to: str = MAIL_RECIP
         smtp.sendmail("external-sender@test.local", [to], msg.as_string())
 
 
-def _sync_mail_account(nc_mcp: McpTestHelper) -> None:
+def _sync_mail_account(account_id: int) -> None:
     """Trigger a mailbox sync so new messages appear in the NC database."""
     container = os.environ.get("NC_CONTAINER", "ncmcp-nextcloud-1")
-    account_id = os.environ.get("MAIL_ACCOUNT_ID", "2")
     cmd = f"php occ mail:account:sync {account_id}"
-    subprocess.run(
+    result = subprocess.run(
         ["docker", "exec", container, "su", "-s", "/bin/bash", "www-data", "-c", cmd],
         capture_output=True,
+        text=True,
         timeout=30,
         check=False,
     )
+    if result.returncode != 0:
+        raise AssertionError(f"mail:account:sync {account_id} failed: {result.stderr}")
 
 
 async def _get_account_id(nc_mcp: McpTestHelper) -> int:
@@ -145,7 +147,7 @@ class TestListMailboxes:
 
     @pytest.mark.asyncio
     async def test_nonexistent_account_fails(self, nc_mcp: McpTestHelper) -> None:
-        with pytest.raises((ToolError, Exception)):
+        with pytest.raises(ToolError):
             await nc_mcp.call("list_mailboxes", account_id=999999)
 
 
@@ -167,7 +169,7 @@ class TestListMailMessages:
         account_id = await _get_account_id(nc_mcp)
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         _send_test_email(f"{UNIQUE}-fields")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         result = await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id)
         parsed = json.loads(result)
         assert len(parsed["data"]) >= 1
@@ -185,7 +187,7 @@ class TestListMailMessages:
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         for i in range(3):
             _send_test_email(f"{UNIQUE}-limit-{i}")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         result = await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=2)
         parsed = json.loads(result)
         assert len(parsed["data"]) <= 2
@@ -205,7 +207,7 @@ class TestListMailMessages:
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         for i in range(3):
             _send_test_email(f"{UNIQUE}-cursor-{i}")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         first_page = json.loads(await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=2))
         if first_page["pagination"]["has_more"]:
             min_id = min(m["id"] for m in first_page["data"])
@@ -221,7 +223,7 @@ class TestListMailMessages:
         account_id = await _get_account_id(nc_mcp)
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         _send_test_email(f"{UNIQUE}-from-struct")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         result = await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=5)
         parsed = json.loads(result)
         assert len(parsed["data"]) >= 1
@@ -232,7 +234,7 @@ class TestListMailMessages:
 
     @pytest.mark.asyncio
     async def test_nonexistent_mailbox_fails(self, nc_mcp: McpTestHelper) -> None:
-        with pytest.raises((ToolError, Exception)):
+        with pytest.raises(ToolError):
             await nc_mcp.call("list_mail_messages", mailbox_id=999999)
 
 
@@ -242,7 +244,7 @@ class TestGetMailMessage:
         account_id = await _get_account_id(nc_mcp)
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         _send_test_email(f"{UNIQUE}-get-full", body="Hello from integration test")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         messages = json.loads(await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=5))
         target = next((m for m in messages["data"] if UNIQUE in str(m.get("subject", ""))), None)
         assert target is not None, "Test message not found in inbox"
@@ -259,7 +261,7 @@ class TestGetMailMessage:
         account_id = await _get_account_id(nc_mcp)
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         _send_test_email(f"{UNIQUE}-body-check", body="unique-body-content-12345")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         messages = json.loads(await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=5))
         target = next((m for m in messages["data"] if "body-check" in str(m.get("subject", ""))), None)
         assert target is not None
@@ -273,7 +275,7 @@ class TestGetMailMessage:
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         subject = f"{UNIQUE}-subject-match-{int(time.time())}"
         _send_test_email(subject, body="test")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         messages = json.loads(await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=5))
         target = next((m for m in messages["data"] if subject in str(m.get("subject", ""))), None)
         assert target is not None
@@ -286,7 +288,7 @@ class TestGetMailMessage:
         account_id = await _get_account_id(nc_mcp)
         inbox_id = await _get_inbox_id(nc_mcp, account_id)
         _send_test_email(f"{UNIQUE}-from-check")
-        _sync_mail_account(nc_mcp)
+        _sync_mail_account(account_id)
         messages = json.loads(await nc_mcp.call("list_mail_messages", mailbox_id=inbox_id, limit=5))
         target = next((m for m in messages["data"] if "from-check" in str(m.get("subject", ""))), None)
         assert target is not None
@@ -297,7 +299,7 @@ class TestGetMailMessage:
 
     @pytest.mark.asyncio
     async def test_nonexistent_message_fails(self, nc_mcp: McpTestHelper) -> None:
-        with pytest.raises((ToolError, Exception)):
+        with pytest.raises(ToolError):
             await nc_mcp.call("get_mail_message", message_id=999999)
 
 
@@ -351,7 +353,7 @@ class TestSendMail:
     @pytest.mark.asyncio
     async def test_send_empty_to_raises(self, nc_mcp: McpTestHelper) -> None:
         account_id = await _get_account_id(nc_mcp)
-        with pytest.raises((ToolError, ValueError)):
+        with pytest.raises(ToolError):
             await nc_mcp.call(
                 "send_mail",
                 account_id=account_id,
@@ -362,7 +364,7 @@ class TestSendMail:
 
     @pytest.mark.asyncio
     async def test_send_nonexistent_account_raises(self, nc_mcp: McpTestHelper) -> None:
-        with pytest.raises((ToolError, ValueError)):
+        with pytest.raises(ToolError):
             await nc_mcp.call(
                 "send_mail",
                 account_id=999999,

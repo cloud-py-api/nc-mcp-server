@@ -67,6 +67,9 @@ def _format_message_full(msg: dict[str, Any]) -> dict[str, Any]:
         result["cc"] = msg["cc"]
     if msg.get("bcc"):
         result["bcc"] = msg["bcc"]
+    message_id = msg.get("messageId")
+    if message_id:
+        result["message_id"] = message_id
     body = msg.get("body")
     if body is not None:
         result["body"] = body

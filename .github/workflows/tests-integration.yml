@@ -71,11 +71,11 @@ jobs:
           docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:install spreed" || echo "spreed already installed"
           docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:install admin_notifications" || echo "admin_notifications already installed"
           docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:install announcementcenter" || echo "announcementcenter already installed"
-          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:install mail" || echo "mail already installed"
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:install mail"
           SMTP4DEV_IP=$(docker inspect ${{ job.services.smtp4dev.id }} --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
           echo "smtp4dev IP: $SMTP4DEV_IP"
           docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ mail:account:create admin 'Test Mail' test@localhost $SMTP4DEV_IP 143 none test test $SMTP4DEV_IP 25 none test test"
-          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ mail:account:sync 1" || echo "mail sync skipped"
+          docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ mail:account:sync 1"
           docker exec $NC_CONTAINER su -s /bin/bash www-data -c "php occ app:list" | head -40
 
       - name: Run integration tests
