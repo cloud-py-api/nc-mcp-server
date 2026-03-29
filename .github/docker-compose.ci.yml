@@ -21,7 +21,7 @@ services:
       - db
     volumes:
       - nextcloud:/var/www/html
-      - ./php-ci.ini:/usr/local/etc/php/conf.d/99-ci-perf.ini:ro
+      - ./zzz-ci-perf.ini:/usr/local/etc/php/conf.d/zzz-ci-perf.ini:ro
       - ./fpm-ci.conf:/usr/local/etc/php-fpm.d/zz-ci.conf:ro
 
   nginx:
