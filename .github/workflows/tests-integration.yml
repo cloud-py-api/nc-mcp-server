@@ -73,7 +73,7 @@ jobs:
           echo "smtp4dev IP: $SMTP4DEV_IP"
           $OCC "php occ mail:account:create admin 'Test Mail' test@localhost $SMTP4DEV_IP 143 none test test $SMTP4DEV_IP 25 none test test"
           $OCC "php occ mail:account:sync 1"
-          APP_PASS=$($OCC "php occ user:auth-tokens:add --name ci-tests admin" | tail -1 | tr -d '[:space:]')
+          APP_PASS=$($OCC "php occ user:auth-tokens:add admin" | grep -oP '[A-Za-z0-9]{72}' | head -1)
           echo "::add-mask::$APP_PASS"
           echo "NC_APP_PASSWORD=$APP_PASS" >> "$GITHUB_ENV"
 
@@ -109,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nextcloud-version: ["33"]
+        nextcloud-version: ["32", "33"]
     services:
       nextcloud:
         image: nextcloud:${{ matrix.nextcloud-version }}
