@@ -69,6 +69,7 @@ def _get_integration_config(permission: PermissionLevel = PermissionLevel.DESTRU
         user=os.environ.get("NEXTCLOUD_USER", "admin"),
         password=os.environ.get("NEXTCLOUD_PASSWORD", "admin"),
         permission_level=permission,
+        is_app_password=os.environ.get("NEXTCLOUD_MCP_APP_PASSWORD", "").lower() in ("true", "1", "yes"),
     )
 
 

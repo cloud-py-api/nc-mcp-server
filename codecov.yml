@@ -1,9 +1,9 @@
 codecov:
   notify:
-    after_n_builds: 5
+    after_n_builds: 7
 
 comment:
-  after_n_builds: 5
+  after_n_builds: 7
   require_changes: true
 
 coverage:

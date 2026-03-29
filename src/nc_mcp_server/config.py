@@ -20,6 +20,7 @@ class Config:
         NEXTCLOUD_MCP_HOST: Host to bind HTTP server (default: 0.0.0.0)
         NEXTCLOUD_MCP_PORT: Port for HTTP server (default: 8100)
         NEXTCLOUD_MCP_RETRY_MAX: Max retries on 429/503 (default: 3, 0 to disable)
+        NEXTCLOUD_MCP_APP_PASSWORD: Set to 'true' when using an app password to skip session caching
     """
 
     nextcloud_url: str = field(default="")
@@ -29,6 +30,7 @@ class Config:
     host: str = field(default="0.0.0.0")
     port: int = field(default=8100)
     retry_max: int = field(default=3)
+    is_app_password: bool = field(default=False)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -52,6 +54,14 @@ class Config:
         except ValueError:
             raise ValueError(f"Invalid NEXTCLOUD_MCP_RETRY_MAX='{retry_raw}'. Expected integer >= 0.") from None
 
+        app_pw_raw = os.environ.get("NEXTCLOUD_MCP_APP_PASSWORD", "").strip().lower()
+        if app_pw_raw in ("", "false", "0", "no"):
+            is_app_password = False
+        elif app_pw_raw in ("true", "1", "yes"):
+            is_app_password = True
+        else:
+            raise ValueError(f"Invalid NEXTCLOUD_MCP_APP_PASSWORD='{app_pw_raw}'. Expected: true/false, 1/0, yes/no.")
+
         return cls(
             nextcloud_url=url,
             user=user,
@@ -60,6 +70,7 @@ class Config:
             host=host,
             port=port,
             retry_max=max(0, retry_max),
+            is_app_password=is_app_password,
         )
 
     def validate(self) -> None:

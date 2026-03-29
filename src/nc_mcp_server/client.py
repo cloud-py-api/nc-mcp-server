@@ -161,10 +161,11 @@ class NextcloudClient:
         Subsequent requests reuse the session cookie, which is validated via a
         fast DB lookup instead of bcrypt.
 
-        When the user provides an app password, session caching still works
-        (NC stores the app password in the PHP session), and the overhead of
-        the two init requests is negligible.
+        When ``Config.is_app_password`` is set, session caching is skipped
+        because app passwords already use a fast token lookup.
         """
+        if self._config.is_app_password:
+            return
         if self._session is None:
             return
         url = f"{self._base_url}/ocs/v2.php/cloud/capabilities"
