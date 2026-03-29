@@ -134,6 +134,10 @@ jobs:
             fi
           done
 
+      - name: Optimize autoloader
+        working-directory: nc-server
+        run: composer dump-autoload --classmap-authoritative
+
       - name: Set up Nextcloud
         working-directory: nc-server
         run: |
@@ -142,8 +146,7 @@ jobs:
             --database-name=nextcloud --database-host=127.0.0.1 --database-port=5432 \
             --database-user=nextcloud --database-pass=nextcloud \
             --admin-user admin --admin-pass admin
-          php occ config:system:set loglevel --value=0 --type=integer
-          php occ config:system:set debug --value=true --type=boolean
+          php occ config:system:set loglevel --value=2 --type=integer
           php occ config:system:set ratelimit.protection.enabled --value=false --type=boolean
           php occ config:system:set auth.bruteforce.protection.enabled --value=false --type=boolean
           php occ config:system:set memcache.local --value='\OC\Memcache\APCu'
