@@ -74,6 +74,7 @@ jobs:
           $OCC "php occ mail:account:create admin 'Test Mail' test@localhost $SMTP4DEV_IP 143 none test test $SMTP4DEV_IP 25 none test test"
           $OCC "php occ mail:account:sync 1"
           APP_PASS=$($OCC "php occ user:auth-tokens:add admin" | grep -oP '[A-Za-z0-9]{72}' | head -1)
+          if [ -z "$APP_PASS" ]; then echo "::error::Failed to generate app password"; exit 1; fi
           echo "::add-mask::$APP_PASS"
           echo "NC_APP_PASSWORD=$APP_PASS" >> "$GITHUB_ENV"
 
