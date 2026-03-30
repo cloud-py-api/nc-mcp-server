@@ -228,6 +228,7 @@ def _build_ical(
     description: str = "",
     location: str = "",
     status: str = "CONFIRMED",
+    categories: list[str] | None = None,
 ) -> str:
     """Build a minimal iCalendar VEVENT string."""
     cal = ICal()
@@ -245,6 +246,8 @@ def _build_ical(
         event.add("location", location)
     if status:
         event.add("status", status)
+    if categories:
+        event.add("categories", categories)
     cal.add_component(event)
     return cal.to_ical().decode()
 
@@ -257,6 +260,13 @@ def _validate_status(status: str) -> str:
     return upper
 
 
+def _set_prop(component: Any, name: str, value: Any, clear_if_empty: bool = False) -> None:
+    component.pop(name, None)
+    if clear_if_empty and not value:
+        return
+    component.add(name.lower(), value)
+
+
 def _apply_event_updates(
     component: Any,
     summary: str | None,
@@ -265,30 +275,24 @@ def _apply_event_updates(
     description: str | None,
     location: str | None,
     status: str | None,
+    categories: list[str] | None = None,
 ) -> None:
     if summary is not None:
-        component.pop("SUMMARY", None)
-        component.add("summary", summary)
+        _set_prop(component, "SUMMARY", summary)
     if start is not None:
-        component.pop("DTSTART", None)
-        component.add("dtstart", _parse_dt(start, _is_all_day(component.get("DTSTART"))))
+        _set_prop(component, "DTSTART", _parse_dt(start, _is_all_day(component.get("DTSTART"))))
     if end is not None:
         ref = component.get("DTEND") or component.get("DTSTART")
-        component.pop("DTEND", None)
-        component.add("dtend", _parse_dt(end, _is_all_day(ref)))
+        _set_prop(component, "DTEND", _parse_dt(end, _is_all_day(ref)))
     if description is not None:
-        component.pop("DESCRIPTION", None)
-        if description:
-            component.add("description", description)
+        _set_prop(component, "DESCRIPTION", description, clear_if_empty=True)
     if location is not None:
-        component.pop("LOCATION", None)
-        if location:
-            component.add("location", location)
+        _set_prop(component, "LOCATION", location, clear_if_empty=True)
     if status is not None:
-        component.pop("STATUS", None)
-        component.add("status", status)
-    component.pop("DTSTAMP", None)
-    component.add("dtstamp", datetime.now(UTC))
+        _set_prop(component, "STATUS", status)
+    if categories is not None:
+        _set_prop(component, "CATEGORIES", categories, clear_if_empty=True)
+    _set_prop(component, "DTSTAMP", datetime.now(UTC))
 
 
 async def _find_event(calendar_id: str, event_uid: str) -> tuple[str, str, str]:
@@ -419,6 +423,7 @@ def _register_create_event(mcp: FastMCP) -> None:
         description: str = "",
         location: str = "",
         status: str = "CONFIRMED",
+        categories: str = "",
     ) -> str:
         """Create a new calendar event.
 
@@ -434,11 +439,13 @@ def _register_create_event(mcp: FastMCP) -> None:
             description: Optional event description/notes.
             location: Optional event location.
             status: Event status: "CONFIRMED" (default), "TENTATIVE", or "CANCELLED".
+            categories: Optional comma-separated category names (e.g. "Work,Meeting").
 
         Returns:
             JSON object with the created event's uid and summary.
         """
         status_upper = _validate_status(status)
+        cat_list = [c.strip() for c in categories.split(",") if c.strip()] if categories else None
         dtstart = _parse_dt(start, all_day)
         if end:
             dtend = _parse_dt(end, all_day)
@@ -448,7 +455,7 @@ def _register_create_event(mcp: FastMCP) -> None:
             dtend = dtstart + timedelta(hours=1)
 
         uid = str(uuid.uuid4())
-        ical_data = _build_ical(uid, summary, dtstart, dtend, description, location, status_upper)
+        ical_data = _build_ical(uid, summary, dtstart, dtend, description, location, status_upper, cat_list)
         client = get_client()
         user = get_config().user
         path = _caldav_path(user, calendar_id, f"{uid}.ics")
@@ -474,6 +481,7 @@ def _register_update_event(mcp: FastMCP) -> None:
         description: str | None = None,
         location: str | None = None,
         status: str | None = None,
+        categories: str | None = None,
     ) -> str:
         """Update an existing calendar event. Only provided fields are changed.
 
@@ -489,16 +497,20 @@ def _register_update_event(mcp: FastMCP) -> None:
             description: New description. Pass "" to clear.
             location: New location. Pass "" to clear.
             status: New status: "CONFIRMED", "TENTATIVE", or "CANCELLED".
+            categories: New categories as comma-separated string. Pass "" to clear.
 
         Returns:
             Confirmation message with the updated event UID.
         """
         validated_status = _validate_status(status) if status is not None else None
+        cat_list: list[str] | None = None
+        if categories is not None:
+            cat_list = [c.strip() for c in categories.split(",") if c.strip()] if categories else []
         href, etag, ical_data = await _find_event(calendar_id, event_uid)
         cal = ICal.from_ical(ical_data)
         for component in cal.walk():
             if component.name == "VEVENT":
-                _apply_event_updates(component, summary, start, end, description, location, validated_status)
+                _apply_event_updates(component, summary, start, end, description, location, validated_status, cat_list)
                 break
 
         client = get_client()

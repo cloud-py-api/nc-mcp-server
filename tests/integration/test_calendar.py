@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+import uuid
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -148,6 +149,24 @@ class TestCreateEvent:
         created = json.loads(result)
         event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=created["uid"]))
         assert "2026-08-01T14:00:00" in event["dtend"]
+
+        await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=created["uid"])
+
+    @pytest.mark.asyncio
+    async def test_create_with_categories(self, nc_mcp: McpTestHelper) -> None:
+        result = await nc_mcp.call(
+            "create_event",
+            calendar_id=CAL_ID,
+            summary="mcp-test-cats",
+            start="2026-08-05T10:00:00Z",
+            categories="Work, Meeting, Important",
+        )
+        created = json.loads(result)
+        event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=created["uid"]))
+        assert "categories" in event
+        assert "Work" in event["categories"]
+        assert "Meeting" in event["categories"]
+        assert "Important" in event["categories"]
 
         await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=created["uid"])
 
@@ -384,6 +403,28 @@ class TestUpdateEvent:
         await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=created["uid"])
 
     @pytest.mark.asyncio
+    async def test_update_categories(self, nc_mcp: McpTestHelper) -> None:
+        created = json.loads(
+            await nc_mcp.call(
+                "create_event",
+                calendar_id=CAL_ID,
+                summary="mcp-test-update-cats",
+                start="2026-12-22T10:00:00Z",
+            )
+        )
+        await nc_mcp.call("update_event", calendar_id=CAL_ID, event_uid=created["uid"], categories="Personal,Travel")
+        event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=created["uid"]))
+        assert "categories" in event
+        assert "Personal" in event["categories"]
+        assert "Travel" in event["categories"]
+
+        await nc_mcp.call("update_event", calendar_id=CAL_ID, event_uid=created["uid"], categories="")
+        event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=created["uid"]))
+        assert "categories" not in event or event.get("categories") == []
+
+        await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=created["uid"])
+
+    @pytest.mark.asyncio
     async def test_update_nonexistent_raises(self, nc_mcp: McpTestHelper) -> None:
         with pytest.raises(ToolError, match="not found"):
             await nc_mcp.call("update_event", calendar_id=CAL_ID, event_uid="nonexistent-uid", summary="x")
@@ -525,6 +566,64 @@ class TestCalendarEdgeCases:
         assert "2027-04-01T10:00:00" in event["dtstart"]
 
         await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=created["uid"])
+
+    @pytest.mark.asyncio
+    async def test_event_with_categories_raw(self, nc_mcp: McpTestHelper) -> None:
+        uid = f"mcp-test-cats-{uuid.uuid4()}"
+        ical = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            "DTSTART:20270601T100000Z\r\n"
+            "DTEND:20270601T110000Z\r\n"
+            "SUMMARY:mcp-test-categories\r\n"
+            "CATEGORIES:Work,Meeting\r\n"
+            "DTSTAMP:20260330T000000Z\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        user = nc_mcp.client._config.user
+        path = f"calendars/{user}/{CAL_ID}/{uid}.ics"
+        await nc_mcp.client.dav_request(
+            "PUT",
+            path,
+            body=ical,
+            headers={"Content-Type": "text/calendar; charset=utf-8"},
+        )
+        event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=uid))
+        assert "categories" in event
+        assert "Work" in event["categories"]
+        assert "Meeting" in event["categories"]
+
+        await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=uid)
+
+    @pytest.mark.asyncio
+    async def test_event_with_rrule(self, nc_mcp: McpTestHelper) -> None:
+        uid = f"mcp-test-rrule-{uuid.uuid4()}"
+        ical = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            "DTSTART:20270701T090000Z\r\n"
+            "DTEND:20270701T100000Z\r\n"
+            "SUMMARY:mcp-test-rrule\r\n"
+            "RRULE:FREQ=WEEKLY;COUNT=4\r\n"
+            "DTSTAMP:20260330T000000Z\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        user = nc_mcp.client._config.user
+        path = f"calendars/{user}/{CAL_ID}/{uid}.ics"
+        await nc_mcp.client.dav_request(
+            "PUT",
+            path,
+            body=ical,
+            headers={"Content-Type": "text/calendar; charset=utf-8"},
+        )
+        event = json.loads(await nc_mcp.call("get_event", calendar_id=CAL_ID, event_uid=uid))
+        assert "rrule" in event
+        assert "WEEKLY" in event["rrule"]
+        assert "COUNT=4" in event["rrule"]
+
+        await nc_mcp.call("delete_event", calendar_id=CAL_ID, event_uid=uid)
 
     @pytest.mark.asyncio
     async def test_create_event_with_no_timezone(self, nc_mcp: McpTestHelper) -> None:
