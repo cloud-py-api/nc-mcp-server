@@ -16,20 +16,20 @@ class TestListNotifications:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
     async def test_empty_when_no_notifications(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert data == []
 
     @pytest.mark.asyncio
     async def test_shows_generated_notification(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.generate_notification(subject="test-visible", message="should appear")
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert len(data) >= 1
         subjects = [n["subject"] for n in data]
         assert "test-visible" in subjects
@@ -38,7 +38,7 @@ class TestListNotifications:
     async def test_notification_has_required_fields(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.generate_notification(subject="fields-check")
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         notif = data[0]
         required_fields = ["notification_id", "app", "user", "datetime", "subject", "message"]
         for field in required_fields:
@@ -51,7 +51,7 @@ class TestListNotifications:
         await nc_mcp.generate_notification(subject="third")
 
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert len(data) >= 3
         # Newest should be first
         subjects = [n["subject"] for n in data[:3]]
@@ -61,7 +61,7 @@ class TestListNotifications:
     async def test_notification_message_content(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.generate_notification(subject="msg-test", message="detailed body text")
         result = await nc_mcp.call("list_notifications")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         notif = next(n for n in data if n["subject"] == "msg-test")
         assert notif["message"] == "detailed body text"
 
@@ -72,14 +72,14 @@ class TestDismissNotification:
         await nc_mcp.generate_notification(subject="to-dismiss")
         await nc_mcp.generate_notification(subject="to-keep")
 
-        data = json.loads(await nc_mcp.call("list_notifications"))
+        data = json.loads(await nc_mcp.call("list_notifications"))["data"]
         target = next(n for n in data if n["subject"] == "to-dismiss")
         nid = target["notification_id"]
 
         result = await nc_mcp.call("dismiss_notification", notification_id=nid)
         assert str(nid) in result
 
-        remaining = json.loads(await nc_mcp.call("list_notifications"))
+        remaining = json.loads(await nc_mcp.call("list_notifications"))["data"]
         remaining_ids = [n["notification_id"] for n in remaining]
         assert nid not in remaining_ids
         # The other one should still be there
@@ -94,7 +94,7 @@ class TestDismissNotification:
     @pytest.mark.asyncio
     async def test_dismiss_confirmation_message(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.generate_notification(subject="confirm-test")
-        data = json.loads(await nc_mcp.call("list_notifications"))
+        data = json.loads(await nc_mcp.call("list_notifications"))["data"]
         nid = data[0]["notification_id"]
 
         result = await nc_mcp.call("dismiss_notification", notification_id=nid)
@@ -108,13 +108,13 @@ class TestDismissAllNotifications:
         await nc_mcp.generate_notification(subject="clear-2")
         await nc_mcp.generate_notification(subject="clear-3")
 
-        data = json.loads(await nc_mcp.call("list_notifications"))
+        data = json.loads(await nc_mcp.call("list_notifications"))["data"]
         assert len(data) >= 3
 
         result = await nc_mcp.call("dismiss_all_notifications")
         assert "dismissed" in result.lower()
 
-        remaining = json.loads(await nc_mcp.call("list_notifications"))
+        remaining = json.loads(await nc_mcp.call("list_notifications"))["data"]
         assert remaining == []
 
     @pytest.mark.asyncio
@@ -123,5 +123,5 @@ class TestDismissAllNotifications:
         result = await nc_mcp.call("dismiss_all_notifications")
         assert "dismissed" in result.lower()
 
-        remaining = json.loads(await nc_mcp.call("list_notifications"))
+        remaining = json.loads(await nc_mcp.call("list_notifications"))["data"]
         assert remaining == []

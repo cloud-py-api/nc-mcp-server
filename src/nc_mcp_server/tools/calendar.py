@@ -366,6 +366,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
         calendar_id: str = "personal",
         start: str = "",
         end: str = "",
+        limit: int = 50,
+        offset: int = 0,
     ) -> str:
         """Get events from a calendar, optionally filtered by time range.
 
@@ -379,13 +381,17 @@ def _register_read_tools(mcp: FastMCP) -> None:
                    Required if end is provided.
             end: Optional range end in ISO 8601 UTC format: "2026-04-30T23:59:59Z".
                  Required if start is provided.
+            limit: Maximum number of events to return (1-500, default 50).
+            offset: Number of events to skip for pagination (default 0).
 
         Returns:
-            JSON list of event objects with: uid, summary, dtstart, dtend, location,
-            description, status, all_day, and optionally rrule and categories.
+            JSON with "data" (list of event objects) and "pagination"
+            (count, offset, limit, has_more).
         """
         if bool(start) != bool(end):
             raise ValueError("Both start and end are required for time-range filtering, or omit both.")
+        limit = max(1, min(500, limit))
+        offset = max(0, offset)
         caldav_start = start.replace("-", "").replace(":", "").replace(".", "") if start else None
         caldav_end = end.replace("-", "").replace(":", "").replace(".", "") if end else None
         if caldav_start:
@@ -405,12 +411,20 @@ def _register_read_tools(mcp: FastMCP) -> None:
             context=f"Get events from '{calendar_id}'",
         )
         results = _parse_report_xml(response.text or "")
-        events = []
+        all_events = []
         for _href, etag, ical_data in results:
             event = _format_event(ical_data)
             event["etag"] = etag
-            events.append(event)
-        return json.dumps(events)
+            all_events.append(event)
+        page = all_events[offset : offset + limit]
+        has_more = offset + limit < len(all_events)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            }
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)

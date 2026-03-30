@@ -42,38 +42,66 @@ def _format_page(p: dict[str, Any]) -> dict[str, Any]:
 def _register_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def list_collectives() -> str:
-        """List all collectives the current user has access to.
+    async def list_collectives(limit: int = 50, offset: int = 0) -> str:
+        """List collectives the current user has access to.
 
         Collectives are shared knowledge bases with wiki-style pages.
-        Each collective has a landing page and may contain nested subpages.
+
+        Args:
+            limit: Maximum number of collectives to return (1-200, default 50).
+            offset: Number of collectives to skip for pagination (default 0).
 
         Returns:
-            JSON list of collectives with id, name, emoji, permissions.
+            JSON with "data" (list of collectives with id, name, emoji, permissions)
+            and "pagination" (count, offset, limit, has_more).
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
         data = await client.ocs_get(f"{API}/collectives")
-        collectives = [_format_collective(c) for c in data["collectives"]]
-        return json.dumps(collectives, default=str)
+        all_collectives = [_format_collective(c) for c in data["collectives"]]
+        page = all_collectives[offset : offset + limit]
+        has_more = offset + limit < len(all_collectives)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def get_collective_pages(collective_id: int) -> str:
-        """List all pages in a collective.
+    async def get_collective_pages(collective_id: int, limit: int = 50, offset: int = 0) -> str:
+        """List pages in a collective.
 
-        Returns the full page tree including the landing page and all subpages.
-        Each page has a title, emoji, timestamp, size, and file path.
+        Returns the page tree including the landing page and all subpages.
 
         Args:
             collective_id: The numeric collective ID. Use list_collectives to find IDs.
+            limit: Maximum number of pages to return (1-200, default 50).
+            offset: Number of pages to skip for pagination (default 0).
 
         Returns:
-            JSON list of pages with id, title, emoji, timestamp, size, file_name, file_path.
+            JSON with "data" (list of pages with id, title, emoji, timestamp, size)
+            and "pagination" (count, offset, limit, has_more).
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
         data = await client.ocs_get(f"{API}/collectives/{collective_id}/pages")
-        pages = [_format_page(p) for p in data["pages"]]
-        return json.dumps(pages, default=str)
+        all_pages = [_format_page(p) for p in data["pages"]]
+        page = all_pages[offset : offset + limit]
+        has_more = offset + limit < len(all_pages)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)

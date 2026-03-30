@@ -24,13 +24,13 @@ class TestListShares:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_shares")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
     async def test_empty_when_no_shares(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_shares")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert data == []
 
     @pytest.mark.asyncio
@@ -38,7 +38,7 @@ class TestListShares:
         await _setup_share_file(nc_mcp)
         await nc_mcp.call("create_share", path=f"/{SHARE_FILE}", share_type=3)
         result = await nc_mcp.call("list_shares")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert len(data) >= 1
         assert any(s["share_type"] == 3 for s in data)
 
@@ -47,7 +47,7 @@ class TestListShares:
         await _setup_share_file(nc_mcp)
         await nc_mcp.call("create_share", path=f"/{SHARE_FILE}", share_type=3)
         result = await nc_mcp.call("list_shares", path=f"/{SHARE_FILE}")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert len(data) >= 1
         assert all(SHARE_FILE.rsplit("/", maxsplit=1)[-1] in str(s.get("path", "")) for s in data)
 
@@ -56,7 +56,7 @@ class TestListShares:
         await _setup_share_file(nc_mcp)
         await nc_mcp.call("create_share", path=f"/{SHARE_FILE}", share_type=3)
         result = await nc_mcp.call("list_shares")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         share = data[0]
         for field in ["id", "share_type", "path", "permissions", "uid_owner"]:
             assert field in share, f"Missing field: {field}"
@@ -66,7 +66,7 @@ class TestListShares:
         await _setup_share_file(nc_mcp)
         await nc_mcp.call("create_share", path=f"/{SHARE_FILE}", share_type=3)
         result = await nc_mcp.call("list_shares", path=f"/{SHARE_DIR}", subfiles=True)
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert len(data) >= 1
 
 
@@ -331,7 +331,7 @@ class TestDeleteShare:
         result = await nc_mcp.call("delete_share", share_id=share_id)
         assert str(share_id) in result
 
-        remaining = json.loads(await nc_mcp.call("list_shares"))
+        remaining = json.loads(await nc_mcp.call("list_shares"))["data"]
         assert not any(str(s.get("id")) == str(share_id) for s in remaining)
 
     @pytest.mark.asyncio
@@ -355,7 +355,7 @@ class TestDeleteShare:
         s2 = json.loads(await nc_mcp.call("create_share", path=f"/{SHARE_FILE}", share_type=3))
         await nc_mcp.call("delete_share", share_id=int(s1["id"]))
 
-        remaining = json.loads(await nc_mcp.call("list_shares"))
+        remaining = json.loads(await nc_mcp.call("list_shares"))["data"]
         remaining_ids = [str(s.get("id")) for s in remaining]
         assert str(s1["id"]) not in remaining_ids
         assert str(s2["id"]) in remaining_ids
@@ -365,7 +365,7 @@ class TestSharePermissionEnforcement:
     @pytest.mark.asyncio
     async def test_list_shares_allowed_read_only(self, nc_mcp_read_only: McpTestHelper) -> None:
         result = await nc_mcp_read_only.call("list_shares")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio

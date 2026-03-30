@@ -71,7 +71,7 @@ class TestUserCanAccessOwnData:
     @pytest.mark.asyncio
     async def test_list_directory(self, user_mcp: McpTestHelper) -> None:
         result = await user_mcp.call("list_directory")
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio
@@ -90,13 +90,13 @@ class TestUserCanAccessOwnData:
     @pytest.mark.asyncio
     async def test_list_shares(self, user_mcp: McpTestHelper) -> None:
         result = await user_mcp.call("list_shares")
-        shares = json.loads(result)
+        shares = json.loads(result)["data"]
         assert isinstance(shares, list)
 
     @pytest.mark.asyncio
     async def test_list_conversations(self, user_mcp: McpTestHelper) -> None:
         result = await user_mcp.call("list_conversations")
-        convs = json.loads(result)
+        convs = json.loads(result)["data"]
         assert isinstance(convs, list)
 
     @pytest.mark.asyncio
@@ -108,7 +108,7 @@ class TestUserCanAccessOwnData:
     @pytest.mark.asyncio
     async def test_list_notifications(self, user_mcp: McpTestHelper) -> None:
         result = await user_mcp.call("list_notifications")
-        notifs = json.loads(result)
+        notifs = json.loads(result)["data"]
         assert isinstance(notifs, list)
 
 

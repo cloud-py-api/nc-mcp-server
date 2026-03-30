@@ -14,21 +14,33 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def list_notifications() -> str:
-        """List all notifications for the current Nextcloud user.
+    async def list_notifications(limit: int = 50, offset: int = 0) -> str:
+        """List notifications for the current Nextcloud user.
 
-        Returns notifications sorted by newest first. Each notification
-        includes: notification_id, app, datetime, subject, message, link,
-        and actions.
+        Returns notifications sorted by newest first.
+
+        Args:
+            limit: Maximum number of notifications to return (1-200, default 50).
+            offset: Number of notifications to skip for pagination (default 0).
 
         Returns:
-            JSON list of notification objects.
+            JSON with "data" (list of notification objects) and "pagination"
+            (count, offset, limit, has_more).
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
-        data = await client.ocs_get(
-            "apps/notifications/api/v2/notifications",
+        data = await client.ocs_get("apps/notifications/api/v2/notifications")
+        page = data[offset : offset + limit]
+        has_more = offset + limit < len(data)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
         )
-        return json.dumps(data, default=str)
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @require_permission(PermissionLevel.DESTRUCTIVE)

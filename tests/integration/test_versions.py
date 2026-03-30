@@ -20,7 +20,7 @@ async def _create_versioned_file(nc_mcp: McpTestHelper, name: str) -> int:
     await nc_mcp.upload_test_file(path, "version 1")
     await asyncio.sleep(1.5)
     await nc_mcp.upload_test_file(path, "version 2")
-    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))
+    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))["data"]
     for entry in listing:
         if f"{VER_PREFIX}-{name}.txt" in entry["path"]:
             return int(entry["file_id"])
@@ -29,7 +29,7 @@ async def _create_versioned_file(nc_mcp: McpTestHelper, name: str) -> int:
 
 async def _get_file_id(nc_mcp: McpTestHelper, name: str) -> int:
     """Get file_id for a file in the test dir."""
-    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))
+    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))["data"]
     for entry in listing:
         if name in entry["path"]:
             return int(entry["file_id"])

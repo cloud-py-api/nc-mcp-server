@@ -80,22 +80,35 @@ def _parse_trash_xml(xml_text: str, user: str) -> list[dict[str, Any]]:
 def _register_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def list_trash() -> str:
-        """List all items in the Nextcloud trash bin.
+    async def list_trash(limit: int = 50, offset: int = 0) -> str:
+        """List items in the Nextcloud trash bin.
 
         Returns files and folders that were deleted and can be restored.
-        Each item includes its original filename, original path, deletion
-        time, and a trash_path identifier needed for restore/delete operations.
+
+        Args:
+            limit: Maximum number of items to return (1-200, default 50).
+            offset: Number of items to skip for pagination (default 0).
 
         Returns:
-            JSON list of trashed items, each with: trash_path, original_name,
-            original_location, deletion_time (unix), is_directory, size, file_id.
-            Use trash_path with restore_trash_item or delete operations.
+            JSON with "data" (list of trashed items with trash_path, original_name,
+            original_location, deletion_time, is_directory, size, file_id) and
+            "pagination" (count, offset, limit, has_more).
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
         xml_text = await client.trashbin_propfind()
         entries = _parse_trash_xml(xml_text, get_config().user)
-        return json.dumps(entries, default=str)
+        page = entries[offset : offset + limit]
+        has_more = offset + limit < len(entries)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
 
 def _register_write_tools(mcp: FastMCP) -> None:

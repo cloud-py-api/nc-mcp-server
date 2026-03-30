@@ -23,7 +23,7 @@ async def _trash_file(nc_mcp: McpTestHelper, name: str, content: str = "trash me
 async def _find_in_trash(nc_mcp: McpTestHelper, name_contains: str) -> dict[str, Any] | None:
     """Find a trashed item whose original_name contains the given substring."""
     result = await nc_mcp.call("list_trash")
-    items = json.loads(result)
+    items = json.loads(result)["data"]
     for item in items:
         if name_contains in str(item.get("original_name", "")):
             return item
@@ -34,21 +34,21 @@ class TestListTrash:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_trash")
-        parsed = json.loads(result)
+        parsed = json.loads(result)["data"]
         assert isinstance(parsed, list)
 
     @pytest.mark.asyncio
     async def test_empty_trash_returns_empty_list(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.call("empty_trash")
         result = await nc_mcp.call("list_trash")
-        assert json.loads(result) == []
+        assert json.loads(result)["data"] == []
 
     @pytest.mark.asyncio
     async def test_deleted_file_appears_in_trash(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "appears")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         names = [i.get("original_name") for i in items]
         assert f"{TRASH_PREFIX}-appears.txt" in names
 
@@ -57,7 +57,7 @@ class TestListTrash:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "fields")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         assert len(items) >= 1
         item = items[0]
         assert "trash_path" in item
@@ -71,7 +71,7 @@ class TestListTrash:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "timestamp")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         assert len(items) >= 1
         assert ".d" in items[0]["trash_path"]
 
@@ -80,7 +80,7 @@ class TestListTrash:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "deltime")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         assert isinstance(items[0]["deletion_time"], int)
         assert items[0]["deletion_time"] > 0
 
@@ -89,7 +89,7 @@ class TestListTrash:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "size", content="hello world")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         assert isinstance(items[0]["size"], int)
         assert items[0]["size"] == 11
 
@@ -101,7 +101,7 @@ class TestListTrash:
         await nc_mcp.client.dav_put(f"{dir_name}/child.txt", b"inside", content_type="text/plain")
         await nc_mcp.client.dav_delete(dir_name)
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         dirs = [i for i in items if i.get("original_name") == dir_name]
         assert len(dirs) == 1
         assert dirs[0]["is_directory"] is True
@@ -113,7 +113,7 @@ class TestListTrash:
         await _trash_file(nc_mcp, "multi2")
         await _trash_file(nc_mcp, "multi3")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         names = [i.get("original_name") for i in items]
         assert f"{TRASH_PREFIX}-multi1.txt" in names
         assert f"{TRASH_PREFIX}-multi2.txt" in names
@@ -124,7 +124,7 @@ class TestListTrash:
         await nc_mcp.call("empty_trash")
         await _trash_file(nc_mcp, "location")
         result = await nc_mcp.call("list_trash")
-        items = json.loads(result)
+        items = json.loads(result)["data"]
         assert items[0]["original_location"] == f"{TRASH_PREFIX}-location.txt"
 
 
@@ -196,7 +196,7 @@ class TestEmptyTrash:
         await _trash_file(nc_mcp, "empty2")
         result = await nc_mcp.call("empty_trash")
         assert "emptied" in result.lower()
-        items = json.loads(await nc_mcp.call("list_trash"))
+        items = json.loads(await nc_mcp.call("list_trash"))["data"]
         assert len(items) == 0
 
     @pytest.mark.asyncio
@@ -209,7 +209,7 @@ class TestEmptyTrash:
     async def test_empty_trash_is_permanent(self, nc_mcp: McpTestHelper) -> None:
         await _trash_file(nc_mcp, "permanent")
         await nc_mcp.call("empty_trash")
-        items = json.loads(await nc_mcp.call("list_trash"))
+        items = json.loads(await nc_mcp.call("list_trash"))["data"]
         names = [i.get("original_name", "") for i in items]
         assert f"{TRASH_PREFIX}-permanent.txt" not in names
 
@@ -218,7 +218,7 @@ class TestTrashbinPermissions:
     @pytest.mark.asyncio
     async def test_read_only_allows_list(self, nc_mcp_read_only: McpTestHelper) -> None:
         result = await nc_mcp_read_only.call("list_trash")
-        assert isinstance(json.loads(result), list)
+        assert isinstance(json.loads(result)["data"], list)
 
     @pytest.mark.asyncio
     async def test_read_only_blocks_restore(self, nc_mcp_read_only: McpTestHelper) -> None:

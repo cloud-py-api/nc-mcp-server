@@ -24,14 +24,14 @@ class TestListDirectory:
     @pytest.mark.asyncio
     async def test_list_root_returns_json(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_directory", path="/")
-        entries: list[dict[str, object]] = json.loads(result)
+        entries: list[dict[str, object]] = json.loads(result)["data"]
         assert isinstance(entries, list)
         assert len(entries) >= 1
 
     @pytest.mark.asyncio
     async def test_entries_have_required_fields(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_directory", path="/")
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         for entry in entries:
             assert "path" in entry
             assert "is_directory" in entry
@@ -42,7 +42,7 @@ class TestListDirectory:
         await nc_mcp.call("upload_file", path=f"{TEST_BASE_DIR}/hello.txt", content="hello")
 
         result = await nc_mcp.call("list_directory", path=TEST_BASE_DIR)
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         paths = [e["path"] for e in entries]
         assert any("hello.txt" in p for p in paths)
 
@@ -50,7 +50,7 @@ class TestListDirectory:
     async def test_list_empty_directory(self, nc_mcp: McpTestHelper) -> None:
         await nc_mcp.call("create_directory", path=TEST_BASE_DIR)
         result = await nc_mcp.call("list_directory", path=TEST_BASE_DIR)
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         assert entries == []
 
     @pytest.mark.asyncio
@@ -62,7 +62,7 @@ class TestListDirectory:
     async def test_default_path_is_root(self, nc_mcp: McpTestHelper) -> None:
         result_default = await nc_mcp.call("list_directory")
         result_root = await nc_mcp.call("list_directory", path="/")
-        assert json.loads(result_default) == json.loads(result_root)
+        assert json.loads(result_default)["data"] == json.loads(result_root)["data"]
 
 
 class TestGetFile:
@@ -145,7 +145,7 @@ class TestCreateDirectory:
         result = await nc_mcp.call("create_directory", path=TEST_BASE_DIR)
         assert "created" in result.lower()
 
-        root = json.loads(await nc_mcp.call("list_directory", path="/"))
+        root = json.loads(await nc_mcp.call("list_directory", path="/"))["data"]
         paths = [e["path"] for e in root]
         assert any(TEST_BASE_DIR in p for p in paths)
 
@@ -232,7 +232,7 @@ class TestFileLifecycle:
         content = await nc_mcp.call("get_file", path=f"{TEST_BASE_DIR}/lifecycle.txt")
         assert content == "lifecycle test"
 
-        entries = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))
+        entries = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))["data"]
         assert len(entries) == 1
         assert entries[0]["is_directory"] is False
 
@@ -245,7 +245,7 @@ class TestFileLifecycle:
         assert content == "lifecycle test"
 
         await nc_mcp.call("delete_file", path=f"{TEST_BASE_DIR}/lifecycle-moved.txt")
-        entries = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))
+        entries = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))["data"]
         assert entries == []
 
         await nc_mcp.call("delete_file", path=TEST_BASE_DIR)

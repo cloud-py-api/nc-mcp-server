@@ -50,7 +50,7 @@ class TestListConversations:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
         result = await nc_mcp.call("list_conversations")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
@@ -58,7 +58,7 @@ class TestListConversations:
         room = await _create_room(nc_mcp, "test-list-conv")
         try:
             result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            data = json.loads(result)["data"]
             tokens = [c["token"] for c in data]
             assert room["token"] in tokens
         finally:
@@ -69,7 +69,7 @@ class TestListConversations:
         room = await _create_room(nc_mcp, "test-fields")
         try:
             result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            data = json.loads(result)["data"]
             conv = next(c for c in data if c["token"] == room["token"])
             required = ["token", "type", "name", "read_only", "unread_messages", "last_activity"]
             for field in required:
@@ -83,7 +83,7 @@ class TestListConversations:
         public_room = await _create_room(nc_mcp, "test-type-public", room_type=3)
         try:
             result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            data = json.loads(result)["data"]
             group = next(c for c in data if c["token"] == group_room["token"])
             public = next(c for c in data if c["token"] == public_room["token"])
             assert group["type"] == "group"
@@ -426,7 +426,7 @@ class TestCreateConversation:
         data = json.loads(result)
         try:
             list_result = await nc_mcp.call("list_conversations")
-            conversations = json.loads(list_result)
+            conversations = json.loads(list_result)["data"]
             tokens = [c["token"] for c in conversations]
             assert data["token"] in tokens
         finally:
@@ -499,7 +499,7 @@ class TestLeaveConversation:
         try:
             await nc_mcp.call("leave_conversation", token=str(room["token"]))
             list_result = await nc_mcp.call("list_conversations")
-            conversations = json.loads(list_result)
+            conversations = json.loads(list_result)["data"]
             tokens = [c["token"] for c in conversations]
             assert room["token"] not in tokens
         finally:
@@ -516,7 +516,7 @@ class TestTalkPermissions:
     @pytest.mark.asyncio
     async def test_read_only_allows_list_conversations(self, nc_mcp_read_only: McpTestHelper) -> None:
         result = await nc_mcp_read_only.call("list_conversations")
-        data = json.loads(result)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio

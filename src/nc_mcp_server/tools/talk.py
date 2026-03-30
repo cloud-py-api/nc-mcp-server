@@ -128,27 +128,43 @@ def _register_read_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def list_conversations(include_notifications_disabled: bool = False) -> str:
-        """List all Talk conversations the current user is part of.
+    async def list_conversations(
+        include_notifications_disabled: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> str:
+        """List Talk conversations the current user is part of.
 
         Returns conversations sorted by last activity (newest first).
-        Each conversation includes: token (unique ID for API calls), type,
-        name, unread counts, and permissions.
 
         Args:
             include_notifications_disabled: If true, also return conversations where
                 notifications are disabled (default: false).
+            limit: Maximum number of conversations to return (1-200, default 50).
+            offset: Number of conversations to skip for pagination (default 0).
 
         Returns:
-            JSON list of conversation objects.
+            JSON with "data" (list of conversation objects) and "pagination"
+            (count, offset, limit, has_more).
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
         params: dict[str, str] = {}
         if not include_notifications_disabled:
             params["noStatusUpdate"] = "0"
         data = await client.ocs_get("apps/spreed/api/v4/room", params=params)
-        conversations = [_format_conversation(room) for room in data]
-        return json.dumps(conversations, default=str)
+        all_convs = [_format_conversation(room) for room in data]
+        page = all_convs[offset : offset + limit]
+        has_more = offset + limit < len(all_convs)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
