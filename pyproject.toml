@@ -22,6 +22,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
+  "icalendar>=7",
   "mcp[cli]>=1.20",
   "niquests>=3",
 ]
@@ -107,7 +108,8 @@ venv = "venv"
 reportUnusedFunction = false
 reportPrivateUsage = false
 executionEnvironments = [
-  { root = "tests/test_client_retry.py", reportAttributeAccessIssue = false, reportUnknownMemberType = false }
+  { root = "tests/test_client_retry.py", reportAttributeAccessIssue = false, reportUnknownMemberType = false },
+  { root = "src/nc_mcp_server/tools/calendar.py", reportUnknownMemberType = false, reportUnknownVariableType = false, reportUnknownArgumentType = false },
 ]
 
 [tool.pytest]

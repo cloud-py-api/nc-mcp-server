@@ -33,6 +33,7 @@
 - [x] Collectives tools: list_collectives, get_collective_pages, get_collective_page (2026-03-29)
 - [x] App Management tools: list_apps, get_app_info, enable_app, disable_app (2026-03-30)
 - [x] User-permission integration tests: non-admin error handling validation (2026-03-30)
+- [x] Calendar tools: list_calendars, get_events, get_event, create_event, update_event, delete_event (2026-03-30)
 
 ### In Progress
 
@@ -40,7 +41,7 @@
 (none)
 
 ### Next Up
-- Phase 3 — Groupware (Calendar, Contacts, Tasks, Deck, Notes)
+- Phase 3 — Groupware (Contacts, Tasks, Deck, Notes)
 
 ## Phases
 
@@ -71,6 +72,7 @@
 | Mail | 5 | 29 |
 | Collectives | 3 | 22 |
 | App Management | 4 | 14 |
+| Calendar | 6 | 37 |
 | User Permissions | — | 15 |
 | Server | — | 7 |
 | Permissions | — | 34 |
@@ -78,4 +80,4 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **67** | **542** |
+| **Total** | **73** | **579** |

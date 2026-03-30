@@ -10,6 +10,7 @@ from .tools import (
     activity,
     announcements,
     app_management,
+    calendar,
     collectives,
     comments,
     files,
@@ -53,6 +54,7 @@ def create_server(config: Config | None = None) -> FastMCP:
     activity.register(mcp)
     announcements.register(mcp)
     app_management.register(mcp)
+    calendar.register(mcp)
     collectives.register(mcp)
     comments.register(mcp)
     files.register(mcp)
