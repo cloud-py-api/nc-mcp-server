@@ -10,7 +10,6 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest
-
 from mcp.server.fastmcp.exceptions import ToolError
 
 from nc_mcp_server.client import NextcloudClient, NextcloudError
