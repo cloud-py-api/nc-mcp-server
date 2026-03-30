@@ -81,6 +81,9 @@ jobs:
           echo "::add-mask::$APP_PASS"
           echo "NC_APP_PASSWORD=$APP_PASS" >> "$GITHUB_ENV"
 
+      - name: Seed pagination test data
+        run: bash scripts/seed_pagination_data.sh http://localhost:8080 admin "$NC_APP_PASSWORD"
+
       - name: Run integration tests
         env:
           NEXTCLOUD_URL: http://localhost:8080

@@ -1,12 +1,32 @@
 """Notification tools — list and dismiss notifications via OCS API."""
 
 import json
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import DESTRUCTIVE, READONLY
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client
+
+
+def _format_notification(n: dict[str, Any]) -> dict[str, Any]:
+    """Extract the most useful fields from a raw notification object."""
+    result: dict[str, Any] = {
+        "notification_id": n.get("notification_id"),
+        "app": n.get("app"),
+        "user": n.get("user"),
+        "datetime": n.get("datetime"),
+        "object_type": n.get("object_type"),
+        "object_id": n.get("object_id"),
+        "subject": n.get("subject"),
+        "message": n.get("message"),
+    }
+    if n.get("link"):
+        result["link"] = n["link"]
+    if n.get("actions"):
+        result["actions"] = n["actions"]
+    return result
 
 
 def register(mcp: FastMCP) -> None:
@@ -24,15 +44,17 @@ def register(mcp: FastMCP) -> None:
             offset: Number of notifications to skip for pagination (default 0).
 
         Returns:
-            JSON with "data" (list of notification objects) and "pagination"
-            (count, offset, limit, has_more).
+            JSON with "data" (list of notification objects with notification_id, app,
+            user, datetime, subject, message, and optionally link and actions) and
+            "pagination" (count, offset, limit, has_more).
         """
         limit = max(1, min(200, limit))
         offset = max(0, offset)
         client = get_client()
         data = await client.ocs_get("apps/notifications/api/v2/notifications")
-        page = data[offset : offset + limit]
-        has_more = offset + limit < len(data)
+        all_notifs = [_format_notification(n) for n in data]
+        page = all_notifs[offset : offset + limit]
+        has_more = offset + limit < len(all_notifs)
 
         return json.dumps(
             {

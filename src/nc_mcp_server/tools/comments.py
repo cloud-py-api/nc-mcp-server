@@ -131,6 +131,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
             "pagination": {
                 "count": len(comments),
                 "offset": offset,
+                "limit": limit,
                 "has_more": len(comments) == limit,
             },
         }

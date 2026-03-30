@@ -423,7 +423,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
             {
                 "data": page,
                 "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
-            }
+            },
+            default=str,
         )
 
     @mcp.tool(annotations=READONLY)

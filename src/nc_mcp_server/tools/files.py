@@ -168,6 +168,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
             "pagination": {
                 "count": len(results),
                 "offset": offset,
+                "limit": limit,
                 "has_more": len(results) == limit,
             },
         }
