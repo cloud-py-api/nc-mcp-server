@@ -19,7 +19,7 @@ async def _create_tag(nc_mcp: McpTestHelper, name: str) -> int:
 async def _get_test_file_id(nc_mcp: McpTestHelper) -> int:
     await nc_mcp.create_test_dir()
     await nc_mcp.upload_test_file(f"{TEST_BASE_DIR}/tagged.txt", "tag me")
-    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR))
+    listing = json.loads(await nc_mcp.call("list_directory", path=TEST_BASE_DIR, limit=200))["data"]
     for entry in listing:
         if "tagged.txt" in entry["path"]:
             return int(entry["file_id"])

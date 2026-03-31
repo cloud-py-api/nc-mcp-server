@@ -61,22 +61,35 @@ def _build_search_xml(user: str, query: str, path: str, limit: int, offset: int,
 def _register_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
-    async def list_directory(path: str = "/") -> str:
+    async def list_directory(path: str = "/", limit: int = 50, offset: int = 0) -> str:
         """List files and folders in a Nextcloud directory.
 
         Args:
             path: Directory path relative to user's root (default: "/" for root).
                   Example: "Documents", "Photos/Vacation"
+            limit: Maximum number of entries to return (1-500, default 50).
+            offset: Number of entries to skip for pagination (default 0).
 
         Returns:
-            JSON list of entries, each with: path, is_directory, size, last_modified, content_type.
+            JSON with "data" (list of entries with path, is_directory, size, etc.)
+            and "pagination" (count, offset, limit, has_more).
         """
+        limit = max(1, min(500, limit))
+        offset = max(0, offset)
         client = get_client()
         entries = await client.dav_propfind(path, depth=1)
-        # First entry is the directory itself — skip it
         if entries and entries[0]["path"].rstrip("/") == path.strip("/"):
             entries = entries[1:]
-        return json.dumps(entries, default=str)
+        page = entries[offset : offset + limit]
+        has_more = offset + limit < len(entries)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
@@ -133,7 +146,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
 
         Returns:
             JSON object with "data" (list of matching files) and "pagination"
-            (count, offset, has_more).
+            (count, offset, limit, has_more).
         """
         if not query and not mimetype:
             raise ValueError("At least one of 'query' or 'mimetype' must be provided.")
@@ -155,6 +168,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
             "pagination": {
                 "count": len(results),
                 "offset": offset,
+                "limit": limit,
                 "has_more": len(results) == limit,
             },
         }

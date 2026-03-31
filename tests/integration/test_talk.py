@@ -49,16 +49,16 @@ def _extract_message_id(line: str) -> int:
 class TestListConversations:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
-        result = await nc_mcp.call("list_conversations")
-        data = json.loads(result)
+        result = await nc_mcp.call("list_conversations", limit=200)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
     async def test_includes_created_conversation(self, nc_mcp: McpTestHelper) -> None:
         room = await _create_room(nc_mcp, "test-list-conv")
         try:
-            result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            result = await nc_mcp.call("list_conversations", limit=200)
+            data = json.loads(result)["data"]
             tokens = [c["token"] for c in data]
             assert room["token"] in tokens
         finally:
@@ -68,8 +68,8 @@ class TestListConversations:
     async def test_conversation_has_required_fields(self, nc_mcp: McpTestHelper) -> None:
         room = await _create_room(nc_mcp, "test-fields")
         try:
-            result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            result = await nc_mcp.call("list_conversations", limit=200)
+            data = json.loads(result)["data"]
             conv = next(c for c in data if c["token"] == room["token"])
             required = ["token", "type", "name", "read_only", "unread_messages", "last_activity"]
             for field in required:
@@ -82,8 +82,8 @@ class TestListConversations:
         group_room = await _create_room(nc_mcp, "test-type-group", room_type=2)
         public_room = await _create_room(nc_mcp, "test-type-public", room_type=3)
         try:
-            result = await nc_mcp.call("list_conversations")
-            data = json.loads(result)
+            result = await nc_mcp.call("list_conversations", limit=200)
+            data = json.loads(result)["data"]
             group = next(c for c in data if c["token"] == group_room["token"])
             public = next(c for c in data if c["token"] == public_room["token"])
             assert group["type"] == "group"
@@ -425,8 +425,8 @@ class TestCreateConversation:
         result = await nc_mcp.call("create_conversation", room_type=2, name="test-create-list-check")
         data = json.loads(result)
         try:
-            list_result = await nc_mcp.call("list_conversations")
-            conversations = json.loads(list_result)
+            list_result = await nc_mcp.call("list_conversations", limit=200)
+            conversations = json.loads(list_result)["data"]
             tokens = [c["token"] for c in conversations]
             assert data["token"] in tokens
         finally:
@@ -498,8 +498,8 @@ class TestLeaveConversation:
         room = await _create_room(nc_mcp, "test-leave-list", room_type=3)
         try:
             await nc_mcp.call("leave_conversation", token=str(room["token"]))
-            list_result = await nc_mcp.call("list_conversations")
-            conversations = json.loads(list_result)
+            list_result = await nc_mcp.call("list_conversations", limit=200)
+            conversations = json.loads(list_result)["data"]
             tokens = [c["token"] for c in conversations]
             assert room["token"] not in tokens
         finally:
@@ -515,8 +515,8 @@ class TestLeaveConversation:
 class TestTalkPermissions:
     @pytest.mark.asyncio
     async def test_read_only_allows_list_conversations(self, nc_mcp_read_only: McpTestHelper) -> None:
-        result = await nc_mcp_read_only.call("list_conversations")
-        data = json.loads(result)
+        result = await nc_mcp_read_only.call("list_conversations", limit=200)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio

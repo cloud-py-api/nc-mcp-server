@@ -21,8 +21,8 @@ async def _create_collective(nc_mcp: McpTestHelper, suffix: str = "") -> dict[st
 
 
 async def _get_landing_page_id(nc_mcp: McpTestHelper, collective_id: int) -> int:
-    result = await nc_mcp.call("get_collective_pages", collective_id=collective_id)
-    pages = json.loads(result)
+    result = await nc_mcp.call("get_collective_pages", collective_id=collective_id, limit=200)
+    pages = json.loads(result)["data"]
     return pages[0]["id"]
 
 
@@ -35,8 +35,8 @@ async def _destroy_collective(nc_mcp: McpTestHelper, collective_id: int) -> None
 
 
 async def _cleanup_collectives(nc_mcp: McpTestHelper) -> None:
-    result = await nc_mcp.call("list_collectives")
-    for c in json.loads(result):
+    result = await nc_mcp.call("list_collectives", limit=200)
+    for c in json.loads(result)["data"]:
         if str(c.get("name", "")).startswith(UNIQUE):
             await _destroy_collective(nc_mcp, c["id"])
 
@@ -44,8 +44,8 @@ async def _cleanup_collectives(nc_mcp: McpTestHelper) -> None:
 class TestListCollectives:
     @pytest.mark.asyncio
     async def test_returns_json_list(self, nc_mcp: McpTestHelper) -> None:
-        result = await nc_mcp.call("list_collectives")
-        data = json.loads(result)
+        result = await nc_mcp.call("list_collectives", limit=200)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
@@ -53,8 +53,8 @@ class TestListCollectives:
         await _cleanup_collectives(nc_mcp)
         coll = await _create_collective(nc_mcp, "list")
         try:
-            result = await nc_mcp.call("list_collectives")
-            names = [c["name"] for c in json.loads(result)]
+            result = await nc_mcp.call("list_collectives", limit=200)
+            names = [c["name"] for c in json.loads(result)["data"]]
             assert coll["name"] in names
         finally:
             await _destroy_collective(nc_mcp, coll["id"])
@@ -63,8 +63,8 @@ class TestListCollectives:
     async def test_collective_has_required_fields(self, nc_mcp: McpTestHelper) -> None:
         coll = await _create_collective(nc_mcp, "fields")
         try:
-            result = await nc_mcp.call("list_collectives")
-            matches = [c for c in json.loads(result) if c["id"] == coll["id"]]
+            result = await nc_mcp.call("list_collectives", limit=200)
+            matches = [c for c in json.loads(result)["data"] if c["id"] == coll["id"]]
             assert len(matches) == 1
             c = matches[0]
             assert "id" in c
@@ -114,8 +114,8 @@ class TestGetCollectivePages:
     async def test_new_collective_has_landing_page(self, nc_mcp: McpTestHelper) -> None:
         coll = await _create_collective(nc_mcp, "pages")
         try:
-            result = await nc_mcp.call("get_collective_pages", collective_id=coll["id"])
-            pages = json.loads(result)
+            result = await nc_mcp.call("get_collective_pages", collective_id=coll["id"], limit=200)
+            pages = json.loads(result)["data"]
             assert len(pages) >= 1
             assert pages[0]["title"] == "Landing page"
         finally:
@@ -125,8 +125,8 @@ class TestGetCollectivePages:
     async def test_page_has_required_fields(self, nc_mcp: McpTestHelper) -> None:
         coll = await _create_collective(nc_mcp, "pgfields")
         try:
-            result = await nc_mcp.call("get_collective_pages", collective_id=coll["id"])
-            page = json.loads(result)[0]
+            result = await nc_mcp.call("get_collective_pages", collective_id=coll["id"], limit=200)
+            page = json.loads(result)["data"][0]
             for field in ["id", "title", "timestamp", "file_name"]:
                 assert field in page, f"Missing field: {field}"
         finally:
@@ -199,7 +199,7 @@ class TestCreateCollectivePage:
                 )
             )
             assert child["title"] == "Child"
-            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"]))
+            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"], limit=200))["data"]
             titles = [p["title"] for p in pages]
             assert "Parent" in titles
             assert "Child" in titles
@@ -223,8 +223,8 @@ class TestTrashAndRestoreCollective:
         coll = await _create_collective(nc_mcp, "trash")
         try:
             await nc_mcp.call("trash_collective", collective_id=coll["id"])
-            result = await nc_mcp.call("list_collectives")
-            ids = [c["id"] for c in json.loads(result)]
+            result = await nc_mcp.call("list_collectives", limit=200)
+            ids = [c["id"] for c in json.loads(result)["data"]]
             assert coll["id"] not in ids
         finally:
             await _destroy_collective(nc_mcp, coll["id"])
@@ -237,7 +237,7 @@ class TestTrashAndRestoreCollective:
             result = await nc_mcp.call("restore_collective", collective_id=coll["id"])
             restored = json.loads(result)
             assert restored["name"] == coll["name"]
-            listed = json.loads(await nc_mcp.call("list_collectives"))
+            listed = json.loads(await nc_mcp.call("list_collectives", limit=200))["data"]
             assert coll["id"] in [c["id"] for c in listed]
         finally:
             await _destroy_collective(nc_mcp, coll["id"])
@@ -262,7 +262,7 @@ class TestTrashAndRestorePage:
                 )
             )
             await nc_mcp.call("trash_collective_page", collective_id=coll["id"], page_id=page["id"])
-            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"]))
+            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"], limit=200))["data"]
             assert page["id"] not in [p["id"] for p in pages]
         finally:
             await _destroy_collective(nc_mcp, coll["id"])
@@ -281,7 +281,7 @@ class TestTrashAndRestorePage:
             result = await nc_mcp.call("restore_collective_page", collective_id=coll["id"], page_id=page["id"])
             restored = json.loads(result)
             assert restored["title"] == "Restore Me"
-            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"]))
+            pages = json.loads(await nc_mcp.call("get_collective_pages", collective_id=coll["id"], limit=200))["data"]
             assert page["id"] in [p["id"] for p in pages]
         finally:
             await _destroy_collective(nc_mcp, coll["id"])
@@ -306,8 +306,8 @@ class TestTrashAndRestorePage:
 class TestCollectivePermissions:
     @pytest.mark.asyncio
     async def test_read_only_allows_list(self, nc_mcp_read_only: McpTestHelper) -> None:
-        result = await nc_mcp_read_only.call("list_collectives")
-        assert isinstance(json.loads(result), list)
+        result = await nc_mcp_read_only.call("list_collectives", limit=200)
+        assert isinstance(json.loads(result)["data"], list)
 
     @pytest.mark.asyncio
     async def test_read_only_blocks_create(self, nc_mcp_read_only: McpTestHelper) -> None:

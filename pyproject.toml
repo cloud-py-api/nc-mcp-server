@@ -93,6 +93,7 @@ lint.extend-ignore = [
   "SIM117",
   "TRY003",
 ]
+lint.extend-per-file-ignores."scripts/**/*.py" = [ "S314", "T201" ]
 lint.extend-per-file-ignores."src/nc_mcp_server/client.py" = [ "S314" ]
 lint.extend-per-file-ignores."src/nc_mcp_server/config.py" = [ "S104" ]
 lint.extend-per-file-ignores."tests/**/*.py" = [ "E402", "S", "UP" ]
@@ -105,6 +106,7 @@ pythonVersion = "3.12"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = "venv"
+exclude = [ "scripts" ]
 reportUnusedFunction = false
 reportPrivateUsage = false
 executionEnvironments = [

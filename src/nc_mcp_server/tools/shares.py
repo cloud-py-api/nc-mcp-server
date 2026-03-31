@@ -45,6 +45,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
         path: str = "",
         reshares: bool = False,
         subfiles: bool = False,
+        limit: int = 50,
+        offset: int = 0,
     ) -> str:
         """List file/folder shares from Nextcloud.
 
@@ -55,11 +57,15 @@ def _register_read_tools(mcp: FastMCP) -> None:
             path: Optional file/folder path to filter shares (e.g. "/Documents/report.pdf").
             reshares: If true, include shares by other users on the same files.
             subfiles: If true and path is a folder, list shares of files inside it (not the folder itself).
+            limit: Maximum number of shares to return (1-200, default 50).
+            offset: Number of shares to skip for pagination (default 0).
 
         Returns:
-            JSON list of share objects with: id, share_type, path, permissions, share_with, etc.
+            JSON with "data" (list of share objects) and "pagination" (count, offset, limit, has_more).
             share_type values: 0=user, 1=group, 3=public link, 4=email, 6=federated, 10=talk room.
         """
+        limit = max(1, min(200, limit))
+        offset = max(0, offset)
         client = get_client()
         params: dict[str, str] = {}
         if path:
@@ -69,8 +75,17 @@ def _register_read_tools(mcp: FastMCP) -> None:
         if subfiles:
             params["subfiles"] = "true"
         data = await client.ocs_get(SHARES_API, params=params)
-        shares = [_format_share(s) for s in data]
-        return json.dumps(shares, default=str)
+        all_shares = [_format_share(s) for s in data]
+        page = all_shares[offset : offset + limit]
+        has_more = offset + limit < len(all_shares)
+
+        return json.dumps(
+            {
+                "data": page,
+                "pagination": {"count": len(page), "offset": offset, "limit": limit, "has_more": has_more},
+            },
+            default=str,
+        )
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)

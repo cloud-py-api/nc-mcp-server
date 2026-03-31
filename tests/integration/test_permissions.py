@@ -27,7 +27,7 @@ class TestReadOnlyPermissions:
     @pytest.mark.asyncio
     async def test_list_directory_allowed(self, nc_mcp_read_only: McpTestHelper) -> None:
         result = await nc_mcp_read_only.call("list_directory", path="/")
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio
@@ -38,8 +38,8 @@ class TestReadOnlyPermissions:
 
     @pytest.mark.asyncio
     async def test_list_notifications_allowed(self, nc_mcp_read_only: McpTestHelper) -> None:
-        result = await nc_mcp_read_only.call("list_notifications")
-        data = json.loads(result)
+        result = await nc_mcp_read_only.call("list_notifications", limit=200)
+        data = json.loads(result)["data"]
         assert isinstance(data, list)
 
     @pytest.mark.asyncio
@@ -84,7 +84,7 @@ class TestWritePermissions:
     @pytest.mark.asyncio
     async def test_list_directory_allowed(self, nc_mcp_write: McpTestHelper) -> None:
         result = await nc_mcp_write.call("list_directory", path="/")
-        entries = json.loads(result)
+        entries = json.loads(result)["data"]
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio

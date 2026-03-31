@@ -112,7 +112,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
 
         Returns:
             JSON object with "data" (list of comments) and "pagination"
-            (count, offset, has_more).
+            (count, offset, limit, has_more).
         """
         limit = max(1, min(100, limit))
         offset = max(0, offset)
@@ -131,6 +131,7 @@ def _register_read_tools(mcp: FastMCP) -> None:
             "pagination": {
                 "count": len(comments),
                 "offset": offset,
+                "limit": limit,
                 "has_more": len(comments) == limit,
             },
         }
