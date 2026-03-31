@@ -37,7 +37,10 @@ def register(mcp: FastMCP) -> None:
     async def list_notifications(limit: int = 50, offset: int = 0) -> str:
         """List notifications for the current Nextcloud user.
 
-        Returns notifications sorted by newest first.
+        Returns notifications sorted by newest first. Note: the Nextcloud
+        server returns at most ~25 notifications per request and does not
+        support server-side pagination, so the effective total is capped
+        by the server regardless of the limit value.
 
         Args:
             limit: Maximum number of notifications to return (1-200, default 50).
