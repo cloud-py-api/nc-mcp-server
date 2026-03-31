@@ -34,6 +34,7 @@
 - [x] App Management tools: list_apps, get_app_info, enable_app, disable_app (2026-03-30)
 - [x] User-permission integration tests: non-admin error handling validation (2026-03-30)
 - [x] Calendar tools: list_calendars, get_events, get_event, create_event, update_event, delete_event (2026-03-30)
+- [x] Contacts tools: list_addressbooks, get_contacts, get_contact, create_contact, update_contact, delete_contact (2026-03-31)
 
 ### In Progress
 
@@ -41,7 +42,7 @@
 (none)
 
 ### Next Up
-- Contacts, Tasks, Deck, Notes
+- Tasks, Deck, Notes
 
 ## Phases
 
@@ -76,6 +77,7 @@
 | Collectives | 3 | 22 |
 | App Management | 4 | 14 |
 | Calendar | 6 | 44 |
+| Contacts | 6 | 36 |
 | User Permissions | — | 15 |
 | Server | — | 7 |
 | Permissions | — | 34 |
@@ -83,4 +85,4 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **73** | **586** |
+| **Total** | **79** | **622** |

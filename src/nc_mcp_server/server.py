@@ -13,6 +13,7 @@ from .tools import (
     calendar,
     collectives,
     comments,
+    contacts,
     files,
     mail,
     notifications,
@@ -57,6 +58,7 @@ def create_server(config: Config | None = None) -> FastMCP:
     calendar.register(mcp)
     collectives.register(mcp)
     comments.register(mcp)
+    contacts.register(mcp)
     files.register(mcp)
     mail.register(mcp)
     notifications.register(mcp)
