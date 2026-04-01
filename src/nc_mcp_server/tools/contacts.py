@@ -288,9 +288,14 @@ def _apply_contact_updates(vcard_data: str, updates: dict[str, Any]) -> str:
     if "given_name" in updates or "family_name" in updates:
         card = ICal.from_ical(vcard_data)
         old_n = card.get("N")
-        family = updates.get("family_name", str(old_n.fields.family) if old_n and hasattr(old_n, "fields") else "")
-        given = updates.get("given_name", str(old_n.fields.given) if old_n and hasattr(old_n, "fields") else "")
-        new_lines.insert(insert_before, f"N:{_vcard_escape(family)};{_vcard_escape(given)};;;")
+        has_fields = old_n and hasattr(old_n, "fields")
+        family = updates.get("family_name", str(old_n.fields.family) if has_fields else "")
+        given = updates.get("given_name", str(old_n.fields.given) if has_fields else "")
+        additional = str(old_n.fields.additional) if has_fields and old_n.fields.additional else ""
+        prefix = str(old_n.fields.prefix) if has_fields and old_n.fields.prefix else ""
+        suffix = str(old_n.fields.suffix) if has_fields and old_n.fields.suffix else ""
+        n_parts = ";".join(_vcard_escape(p) for p in [family, given, additional, prefix, suffix])
+        new_lines.insert(insert_before, f"N:{n_parts}")
         if not updates.get("full_name"):
             new_lines.insert(insert_before, f"FN:{_vcard_escape(f'{given} {family}'.strip())}")
     for key, vcard_field in _SIMPLE_UPDATE_FIELDS:

@@ -427,6 +427,40 @@ class TestUpdateStructuredName:
         assert updated["name"]["family"] == "Doe"
 
     @pytest.mark.asyncio
+    async def test_update_preserves_prefix_suffix(self, nc_mcp: McpTestHelper) -> None:
+        uid = "mcp-name-upd-prefix"
+        full_name = f"{PREFIX}-upd-prefix"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{full_name}",
+            "N:Doe;John;William;Dr.;Jr.",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        assert contact["name"]["prefix"] == "Dr."
+        assert contact["name"]["suffix"] == "Jr."
+        assert contact["name"]["additional"] == "William"
+        updated = json.loads(
+            await nc_mcp.call("update_contact", uid=uid, etag=contact["etag"], given_name="Jane", book_id=BOOK_ID)
+        )
+        assert updated["name"]["given"] == "Jane"
+        assert updated["name"]["family"] == "Doe"
+        assert updated["name"]["additional"] == "William"
+        assert updated["name"]["prefix"] == "Dr."
+        assert updated["name"]["suffix"] == "Jr."
+
+    @pytest.mark.asyncio
     async def test_update_full_name_with_given(self, nc_mcp: McpTestHelper) -> None:
         uid = await _put_vcard_with_name(nc_mcp, "upd-fn-given", given="John", family="Doe")
         contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
