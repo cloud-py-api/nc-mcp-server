@@ -48,6 +48,67 @@ def _vcard_escape(text: str) -> str:
     return normalized.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
+def _parse_org_components(raw_value: str) -> list[str]:
+    """Split a raw vCard ORG value into unescaped component strings.
+
+    Correctly distinguishes component-separator ';' from escaped '\\;' (literal
+    semicolon within a component).  Also unescapes \\\\, \\, and \\n.
+    """
+    components: list[str] = []
+    current: list[str] = []
+    i = 0
+    while i < len(raw_value):
+        if raw_value[i] == "\\" and i + 1 < len(raw_value):
+            nc = raw_value[i + 1]
+            if nc == ";":
+                current.append(";")
+            elif nc == ",":
+                current.append(",")
+            elif nc in ("n", "N"):
+                current.append("\n")
+            elif nc == "\\":
+                current.append("\\")
+            else:
+                current.append(raw_value[i : i + 2])
+            i += 2
+        elif raw_value[i] == ";":
+            components.append("".join(current))
+            current = []
+            i += 1
+        else:
+            current.append(raw_value[i])
+            i += 1
+    components.append("".join(current))
+    return components
+
+
+def _extract_raw_org(vcard_data: str) -> str | None:
+    """Extract ORG from raw vCard text, correctly handling escaped semicolons.
+
+    icalendar's ORG parser splits on ALL semicolons including escaped ones,
+    so we parse the raw line ourselves.  Returns components joined by ';'
+    with '\\;' for literal semicolons within a component, or None if absent.
+    """
+    for line in vcard_data.replace("\r\n ", "").replace("\r\n\t", "").splitlines():
+        key = line.split(";")[0].split(":")[0]
+        bare = key.split(".", 1)[1] if "." in key else key
+        if bare.upper() == "ORG" and ":" in line:
+            raw_value = line.split(":", 1)[1]
+            parts = _parse_org_components(raw_value)
+            return ";".join(p.replace("\\", "\\\\").replace(";", "\\;") for p in parts)
+    return None
+
+
+def _vcard_escape_org(text: str) -> str:
+    """Escape an ORG value, preserving ';' as the component separator (RFC 2426 Section 3.5.5).
+
+    Uses the same escape-aware parser as _extract_raw_org so that \\; (literal
+    semicolon) and \\\\; (backslash-terminated component + separator) are both
+    handled correctly.
+    """
+    return ";".join(_vcard_escape(c) for c in _parse_org_components(text))
+
+
 def _normalize_entries(entries: list[dict[str, str]], default_type: str) -> list[dict[str, str]]:
     """Normalize typed entries, ensuring each has 'value' and a default 'type'."""
     result: list[dict[str, str]] = []
@@ -217,10 +278,9 @@ def _format_contact(vcard_data: str) -> dict[str, Any]:
     name = _parse_structured_name(card)
     if name:
         contact["name"] = name
-    org = card.get("ORG")
-    if org is not None:
-        parts = org.ical_value if hasattr(org, "ical_value") else (str(org),)
-        contact["organization"] = parts[0] if len(parts) == 1 else ";".join(parts)
+    raw_org = _extract_raw_org(vcard_data)
+    if raw_org is not None:
+        contact["organization"] = raw_org
     for field, key in [("TITLE", "title"), ("NOTE", "note"), ("BDAY", "birthday"), ("REV", "revision")]:
         val = card.get(field)
         if val is not None:
@@ -249,8 +309,9 @@ def _build_vcard(fields: dict[str, Any]) -> str:
         if not fields.get("full_name"):
             fn = f"{given} {family}".strip()
             lines.append(f"FN:{_vcard_escape(fn)}")
-    elif fields.get("full_name") and ";" not in fields.get("full_name", ""):
-        parts = fields["full_name"].split(maxsplit=1)
+    elif fields.get("full_name"):
+        clean = fields["full_name"].replace(";", ",")
+        parts = clean.split(maxsplit=1)
         given = parts[0] if parts else ""
         family = parts[1] if len(parts) > 1 else ""
         lines.append(f"N:{_vcard_escape(family)};{_vcard_escape(given)};;;")
@@ -261,7 +322,7 @@ def _build_vcard(fields: dict[str, Any]) -> str:
         type_part = f";TYPE={entry['type']}" if entry.get("type") else ""
         lines.append(f"TEL{type_part}:{_vcard_escape(entry['value'])}")
     if fields.get("organization"):
-        lines.append(f"ORG:{_vcard_escape(fields['organization'])}")
+        lines.append(f"ORG:{_vcard_escape_org(fields['organization'])}")
     if fields.get("title"):
         lines.append(f"TITLE:{_vcard_escape(fields['title'])}")
     if fields.get("note"):
@@ -312,18 +373,39 @@ def _unfold_vcard_lines(vcard_data: str) -> list[str]:
     return lines
 
 
+_GROUP_METADATA_FIELDS = {"X-ABLABEL"}
+
+
 def _strip_updated_fields(lines: list[str], skip_fields: set[str]) -> list[str]:
     """Remove lines whose vCard field name is in skip_fields.
 
-    Handles group prefixes (e.g. 'item1.EMAIL;TYPE=WORK:...' → field 'EMAIL').
+    Handles group prefixes (e.g. 'item1.EMAIL;TYPE=WORK:...' → field 'EMAIL')
+    and also removes orphaned group metadata (X-ABLabel etc.) when all
+    "real" properties in that group have been stripped.
     """
+    group_real: dict[str, list[str]] = {}
+    for line in lines:
+        raw_field = line.split(";")[0].split(":")[0].upper() if ":" in line else ""
+        if "." in raw_field:
+            group, field_name = raw_field.split(".", 1)
+            if field_name not in _GROUP_METADATA_FIELDS:
+                group_real.setdefault(group, []).append(field_name)
+    orphan_groups: set[str] = set()
+    for group, fields in group_real.items():
+        if all(f in skip_fields for f in fields):
+            orphan_groups.add(group)
     result: list[str] = []
     for line in lines:
-        field_name = line.split(";")[0].split(":")[0].upper() if ":" in line else ""
-        if "." in field_name:
-            field_name = field_name.split(".", 1)[1]
-        if field_name not in skip_fields:
-            result.append(line)
+        raw_field = line.split(";")[0].split(":")[0].upper() if ":" in line else ""
+        group = ""
+        field_name = raw_field
+        if "." in raw_field:
+            group, field_name = raw_field.split(".", 1)
+        if field_name in skip_fields:
+            continue
+        if group and group in orphan_groups:
+            continue
+        result.append(line)
     return result
 
 
@@ -376,7 +458,8 @@ def _apply_contact_updates(vcard_data: str, updates: dict[str, Any]) -> str:
         new_lines.insert(insert_before, f"FN:{_vcard_escape(_synthesize_fn(card))}")
     for key, vcard_field in _SIMPLE_UPDATE_FIELDS:
         if updates.get(key):
-            new_lines.insert(insert_before, f"{vcard_field}:{_vcard_escape(updates[key])}")
+            escape = _vcard_escape_org if vcard_field == "ORG" else _vcard_escape
+            new_lines.insert(insert_before, f"{vcard_field}:{escape(updates[key])}")
     for prop_name, entries_key in [("EMAIL", "email_entries"), ("TEL", "phone_entries")]:
         if entries_key in updates:
             for entry in updates[entries_key]:

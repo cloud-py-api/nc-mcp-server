@@ -177,6 +177,20 @@ class TestCreateContact:
             await nc_mcp.call("create_contact", email="noname@test.com", book_id=BOOK_ID)
 
     @pytest.mark.asyncio
+    async def test_create_full_name_with_semicolon_has_n_field(self, nc_mcp: McpTestHelper) -> None:
+        """A full_name containing ';' (e.g. company name) must still produce a valid N field."""
+        contact = await _create(nc_mcp, "Smith; Associates")
+        config = get_config()
+        raw = await nc_mcp.client.dav_request(
+            "GET",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{contact['uid']}.vcf",
+            context="Read raw vCard",
+        )
+        body = raw.text or ""
+        lines = [line.split(":", 1)[0].upper() for line in body.splitlines() if ":" in line]
+        assert "N" in lines, f"vCard is missing required N field: {body!r}"
+
+    @pytest.mark.asyncio
     async def test_create_unicode_name(self, nc_mcp: McpTestHelper) -> None:
         contact = await _create(nc_mcp, "unicode-Müller-日本語")
         assert "Müller" in contact["full_name"]
@@ -273,6 +287,156 @@ class TestUpdateContact:
             )
         )
         assert updated.get("organization") == "New Corp"
+
+    @pytest.mark.asyncio
+    async def test_update_multicomponent_org_roundtrip(self, nc_mcp: McpTestHelper) -> None:
+        """Writing back a multi-component ORG must not escape the component separators.
+
+        ORG uses ';' as a component separator (Company;Department;Team).
+        Reading returns 'Acme Inc;Engineering;Backend'. Writing that value back
+        via update_contact must produce ORG:Acme Inc;Engineering;Backend in the
+        raw vCard, NOT ORG:Acme Inc\\;Engineering\\;Backend.
+        """
+        uid = "mcp-org-multi"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{PREFIX}-org-multi",
+            f"N:;{PREFIX}-org-multi;;;",
+            "ORG:Acme Inc;Engineering;Backend",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        assert contact.get("organization") == "Acme Inc;Engineering;Backend"
+        updated = json.loads(
+            await nc_mcp.call(
+                "update_contact",
+                uid=uid,
+                etag=contact["etag"],
+                organization=contact["organization"],
+                book_id=BOOK_ID,
+            )
+        )
+        assert updated.get("organization") == "Acme Inc;Engineering;Backend"
+        raw = await nc_mcp.client.dav_request(
+            "GET",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            context="Read raw vCard",
+        )
+        body = raw.text or ""
+        assert "ORG:Acme Inc;Engineering;Backend" in body, (
+            f"ORG component separators were escaped in raw vCard: {body!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_org_escaped_semicolon_roundtrip(self, nc_mcp: McpTestHelper) -> None:
+        """ORG with a literal semicolon inside a component must survive read→update→write.
+
+        ORG:Acme\\; Holdings;Engineering has 2 components: 'Acme; Holdings' and
+        'Engineering'. The escaped semicolon must not be confused with the
+        component separator on round-trip.
+        """
+        uid = "mcp-org-escsemi"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{PREFIX}-org-escsemi",
+            f"N:;{PREFIX}-org-escsemi;;;",
+            "ORG:Acme\\; Holdings;Engineering",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        assert contact.get("organization") == "Acme\\; Holdings;Engineering", (
+            f"Read should preserve escaped semicolon: {contact.get('organization')!r}"
+        )
+        updated = json.loads(
+            await nc_mcp.call(
+                "update_contact",
+                uid=uid,
+                etag=contact["etag"],
+                organization=contact["organization"],
+                book_id=BOOK_ID,
+            )
+        )
+        assert updated.get("organization") == "Acme\\; Holdings;Engineering"
+        raw = await nc_mcp.client.dav_request(
+            "GET",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            context="Read raw vCard",
+        )
+        body = raw.text or ""
+        assert "ORG:Acme\\; Holdings;Engineering" in body, (
+            f"Escaped semicolon lost in raw vCard (should have 2 components, not 3): {body!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_org_backslash_before_separator_roundtrip(self, nc_mcp: McpTestHelper) -> None:
+        r"""ORG component ending with literal backslash must not merge with the next.
+
+        ORG:Foo\\;Bar has 2 components: 'Foo\' and 'Bar'.  The '\\\\' is an
+        escaped backslash, followed by ';' component separator.  This must not
+        be confused with '\\;' (escaped semicolon = 1 component 'Foo;Bar').
+        """
+        uid = "mcp-org-bslash"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{PREFIX}-org-bslash",
+            f"N:;{PREFIX}-org-bslash;;;",
+            "ORG:Foo\\\\;Bar",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        assert contact.get("organization") == "Foo\\\\;Bar", (
+            f"Read should show escaped backslash + separator: {contact.get('organization')!r}"
+        )
+        updated = json.loads(
+            await nc_mcp.call(
+                "update_contact",
+                uid=uid,
+                etag=contact["etag"],
+                organization=contact["organization"],
+                book_id=BOOK_ID,
+            )
+        )
+        assert updated.get("organization") == "Foo\\\\;Bar"
+        raw = await nc_mcp.client.dav_request(
+            "GET",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            context="Read raw vCard",
+        )
+        body = raw.text or ""
+        assert "ORG:Foo\\\\;Bar" in body, f"Backslash-terminated component collapsed with next: {body!r}"
 
     @pytest.mark.asyncio
     async def test_update_preserves_unchanged_fields(self, nc_mcp: McpTestHelper) -> None:
@@ -636,6 +800,115 @@ class TestMultiValueEmailPhone:
         values = [e["value"] for e in updated.get("emails", [])]
         assert "new@test.com" in values
         assert "grouped@test.com" not in values, "Grouped EMAIL property was not stripped"
+
+    @pytest.mark.asyncio
+    async def test_update_email_strips_orphan_group_labels(self, nc_mcp: McpTestHelper) -> None:
+        """Replacing grouped EMAIL must also remove the group's X-ABLabel lines."""
+        uid = "mcp-grouped-label"
+        full_name = f"{PREFIX}-grouped-label"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{full_name}",
+            f"N:;{full_name};;;",
+            "item1.EMAIL;TYPE=WORK:work@test.com",
+            "item1.X-ABLabel:Work",
+            "item2.EMAIL;TYPE=HOME:home@test.com",
+            "item2.X-ABLabel:Home",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        new_emails = [{"value": "new@test.com", "type": "WORK"}]
+        updated = json.loads(
+            await nc_mcp.call("update_contact", uid=uid, etag=contact["etag"], emails=new_emails, book_id=BOOK_ID)
+        )
+        assert [e["value"] for e in updated.get("emails", [])] == ["new@test.com"]
+        raw = await nc_mcp.client.dav_request(
+            "GET",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            context="Read raw vCard",
+        )
+        body = raw.text or ""
+        assert "X-ABLABEL" not in body.upper(), f"Orphan X-ABLabel lines remain after email update: {body!r}"
+
+    @pytest.mark.asyncio
+    async def test_update_email_preserves_tel_in_same_group(self, nc_mcp: McpTestHelper) -> None:
+        """If a group contains both EMAIL and TEL, updating EMAIL must NOT remove the TEL."""
+        uid = "mcp-mixed-group"
+        full_name = f"{PREFIX}-mixed-group"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{full_name}",
+            f"N:;{full_name};;;",
+            "item1.EMAIL;TYPE=WORK:work@test.com",
+            "item1.TEL;TYPE=WORK:+1111111111",
+            "item1.X-ABLabel:Work",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        new_emails = [{"value": "new@test.com", "type": "HOME"}]
+        updated = json.loads(
+            await nc_mcp.call("update_contact", uid=uid, etag=contact["etag"], emails=new_emails, book_id=BOOK_ID)
+        )
+        assert [e["value"] for e in updated.get("emails", [])] == ["new@test.com"]
+        assert any(p["value"] == "+1111111111" for p in updated.get("phones", [])), (
+            f"TEL in same group was incorrectly removed: {updated}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_tel_preserves_email_in_same_group(self, nc_mcp: McpTestHelper) -> None:
+        """Mirror test: updating TEL must not remove EMAIL sharing the same group."""
+        uid = "mcp-mixed-group2"
+        full_name = f"{PREFIX}-mixed-group2"
+        lines = [
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            f"UID:{uid}",
+            f"FN:{full_name}",
+            f"N:;{full_name};;;",
+            "item1.EMAIL;TYPE=WORK:keep@test.com",
+            "item1.TEL;TYPE=WORK:+2222222222",
+            "END:VCARD",
+        ]
+        vcard = "\r\n".join(lines) + "\r\n"
+        config = get_config()
+        await nc_mcp.client.dav_request(
+            "PUT",
+            f"addressbooks/users/{config.user}/{BOOK_ID}/{uid}.vcf",
+            body=vcard,
+            headers={"Content-Type": "text/vcard; charset=utf-8"},
+            context=f"Create test contact '{uid}'",
+        )
+        contact = json.loads(await nc_mcp.call("get_contact", uid=uid, book_id=BOOK_ID))
+        new_phones = [{"value": "+9999999999", "type": "CELL"}]
+        updated = json.loads(
+            await nc_mcp.call("update_contact", uid=uid, etag=contact["etag"], phones=new_phones, book_id=BOOK_ID)
+        )
+        assert [p["value"] for p in updated.get("phones", [])] == ["+9999999999"]
+        assert any(e["value"] == "keep@test.com" for e in updated.get("emails", [])), (
+            f"EMAIL in same group was incorrectly removed: {updated}"
+        )
 
 
 class TestContactCategories:
