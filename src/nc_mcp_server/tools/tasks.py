@@ -237,6 +237,11 @@ def _build_task_ical(
     todo.add("dtstamp", datetime.now(UTC))
     todo.add("summary", summary)
     todo.add("status", status)
+    if status == "COMPLETED":
+        todo.add("percent-complete", 100)
+        todo.add("completed", datetime.now(UTC))
+    elif percent_complete:
+        todo.add("percent-complete", percent_complete)
     if description:
         todo.add("description", description)
     if due:
@@ -245,8 +250,6 @@ def _build_task_ical(
         todo.add("dtstart", _parse_iso_dt(start))
     if priority:
         todo.add("priority", priority)
-    if percent_complete:
-        todo.add("percent-complete", percent_complete)
     if categories:
         todo.add("categories", categories)
     cal.add_component(todo)
@@ -387,6 +390,19 @@ def _update_dt_prop(component: Any, name: str, value: str | None) -> None:
         component.pop(name, None)
 
 
+def _normalize_status(component: Any, status: str, reset_percent: bool) -> None:
+    """Set STATUS and ensure PERCENT-COMPLETE/COMPLETED are consistent."""
+    _set_prop(component, "STATUS", status)
+    if status == "COMPLETED":
+        _set_prop(component, "PERCENT-COMPLETE", 100)
+        if component.get("COMPLETED") is None:
+            _set_prop(component, "COMPLETED", datetime.now(UTC))
+    elif status in ("NEEDS-ACTION", "IN-PROCESS"):
+        component.pop("COMPLETED", None)
+        if reset_percent:
+            _set_prop(component, "PERCENT-COMPLETE", 0)
+
+
 def _apply_task_updates(
     component: Any,
     summary: str | None,
@@ -404,17 +420,12 @@ def _apply_task_updates(
         _set_prop(component, "DESCRIPTION", description, clear_if_empty=True)
     _update_dt_prop(component, "DUE", due)
     _update_dt_prop(component, "DTSTART", start)
-    if status is not None:
-        _set_prop(component, "STATUS", status)
-        if status == "COMPLETED":
-            _set_prop(component, "COMPLETED", datetime.now(UTC))
-            _set_prop(component, "PERCENT-COMPLETE", 100)
-        elif status in ("NEEDS-ACTION", "IN-PROCESS"):
-            component.pop("COMPLETED", None)
     if priority is not None:
         _set_prop(component, "PRIORITY", priority)
     if percent_complete is not None:
         _set_prop(component, "PERCENT-COMPLETE", percent_complete)
+    if status is not None:
+        _normalize_status(component, status, reset_percent=percent_complete is None)
     if categories is not None:
         _set_prop(component, "CATEGORIES", categories, clear_if_empty=True)
     _set_prop(component, "DTSTAMP", datetime.now(UTC))
@@ -572,23 +583,28 @@ def _register_complete_task(mcp: FastMCP) -> None:
         """
         href, etag, ical_data = await _find_task(list_id, task_uid)
         cal = ICal.from_ical(ical_data)
+        needs_update = False
         for component in cal.walk():
             if component.name != "VTODO":
                 continue
+            if str(component.get("STATUS", "")) == "COMPLETED" and component.get("COMPLETED") is not None:
+                break
             _set_prop(component, "STATUS", "COMPLETED")
             _set_prop(component, "PERCENT-COMPLETE", 100)
             _set_prop(component, "COMPLETED", datetime.now(UTC))
             _set_prop(component, "DTSTAMP", datetime.now(UTC))
+            needs_update = True
             break
 
-        client = get_client()
-        await client.dav_request(
-            "PUT",
-            _href_to_dav_path(href),
-            body=cal.to_ical().decode(),
-            headers={"Content-Type": "text/calendar; charset=utf-8", "If-Match": f'"{etag}"'},
-            context=f"Complete task '{task_uid}'",
-        )
+        if needs_update:
+            client = get_client()
+            await client.dav_request(
+                "PUT",
+                _href_to_dav_path(href),
+                body=cal.to_ical().decode(),
+                headers={"Content-Type": "text/calendar; charset=utf-8", "If-Match": f'"{etag}"'},
+                context=f"Complete task '{task_uid}'",
+            )
         return f"Task '{task_uid}' completed."
 
 
