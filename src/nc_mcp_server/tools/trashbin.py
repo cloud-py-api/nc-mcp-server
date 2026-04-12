@@ -9,7 +9,7 @@ from urllib.parse import unquote as url_unquote
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import ADDITIVE_IDEMPOTENT, DESTRUCTIVE, READONLY
-from ..client import DAV_NS, NC_NS, OC_NS
+from ..client import DAV_NS, NC_NS, OC_NS, find_ok_prop
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client, get_config
 
@@ -66,10 +66,7 @@ def _parse_trash_xml(xml_text: str, user: str) -> list[dict[str, Any]]:
         trash_path = href.split(trash_prefix, 1)[1].rstrip("/") if trash_prefix in href else ""
         if not trash_path:
             continue
-        propstat = response.find(f"{{{DAV_NS}}}propstat")
-        if propstat is None:
-            continue
-        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        prop = find_ok_prop(response)
         if prop is None:
             continue
         entries.append(_parse_trash_entry(prop, trash_path))

@@ -12,7 +12,7 @@ from icalendar import Todo as ITodo
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import ADDITIVE, ADDITIVE_IDEMPOTENT, DESTRUCTIVE, READONLY
-from ..client import DAV_NS, NextcloudError
+from ..client import DAV_NS, NextcloudError, find_ok_prop
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client, get_config
 
@@ -103,10 +103,7 @@ def _parse_task_lists_xml(xml_text: str, user: str) -> list[dict[str, Any]]:
         if list_id in SKIP_COLLECTIONS:
             continue
 
-        propstat = response.find(f"{{{DAV_NS}}}propstat")
-        if propstat is None:
-            continue
-        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        prop = find_ok_prop(response)
         if prop is None:
             continue
         rt = prop.find(f"{{{DAV_NS}}}resourcetype")
@@ -131,7 +128,7 @@ def _build_task_query_xml(uid: str | None = None) -> str:
     if uid:
         escaped = xml_escape(uid)
         parts.append('<cal:prop-filter name="UID">')
-        parts.append(f"<cal:text-match>{escaped}</cal:text-match>")
+        parts.append(f'<cal:text-match match-type="equals">{escaped}</cal:text-match>')
         parts.append("</cal:prop-filter>")
     parts.append("</cal:comp-filter></cal:comp-filter></cal:filter>")
     parts.append("</cal:calendar-query>")

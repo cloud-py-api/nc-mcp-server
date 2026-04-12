@@ -70,6 +70,24 @@ DAV_NS = "DAV:"
 OC_NS = "http://owncloud.org/ns"
 NC_NS = "http://nextcloud.org/ns"
 
+
+def find_ok_prop(response: ET.Element) -> ET.Element | None:
+    """Find the <d:prop> from the first propstat with HTTP 200 status.
+
+    WebDAV multi-status responses may contain multiple propstat elements
+    with different status codes (e.g. 200 for found props, 404 for missing ones).
+    The ordering is not guaranteed, so we iterate all of them.
+    """
+    for propstat in response.findall(f"{{{DAV_NS}}}propstat"):
+        status_el = propstat.find(f"{{{DAV_NS}}}status")
+        if status_el is not None and "200" not in (status_el.text or ""):
+            continue
+        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        if prop is not None:
+            return prop
+    return None
+
+
 # Standard PROPFIND body for file listings
 PROPFIND_BODY = """<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
@@ -430,10 +448,7 @@ class NextcloudClient:
             # Strip the DAV prefix to get the relative path
             path = (href.split(dav_prefix, 1)[1] if dav_prefix in href else href).rstrip("/")
 
-            propstat = response.find(f"{{{DAV_NS}}}propstat")
-            if propstat is None:
-                continue
-            prop = propstat.find(f"{{{DAV_NS}}}prop")
+            prop = find_ok_prop(response)
             if prop is None:
                 continue
 
