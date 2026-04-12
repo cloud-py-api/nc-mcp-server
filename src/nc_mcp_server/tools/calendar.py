@@ -12,7 +12,7 @@ from icalendar import Event as IEvent
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import ADDITIVE, ADDITIVE_IDEMPOTENT, DESTRUCTIVE, READONLY
-from ..client import DAV_NS, NextcloudError
+from ..client import DAV_NS, NextcloudError, find_ok_prop
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client, get_config
 
@@ -122,10 +122,7 @@ def _parse_calendars_xml(xml_text: str, user: str) -> list[dict[str, Any]]:
         if cal_id in SKIP_CALENDARS:
             continue
 
-        propstat = response.find(f"{{{DAV_NS}}}propstat")
-        if propstat is None:
-            continue
-        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        prop = find_ok_prop(response)
         if prop is None:
             continue
         rt = prop.find(f"{{{DAV_NS}}}resourcetype")

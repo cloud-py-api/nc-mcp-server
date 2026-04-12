@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import ADDITIVE, ADDITIVE_IDEMPOTENT, DESTRUCTIVE, READONLY
-from ..client import NextcloudError
+from ..client import NextcloudError, find_ok_prop
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client
 
@@ -30,13 +30,7 @@ def _parse_tags_xml(xml_text: str) -> list[dict[str, Any]]:
     root = ET.fromstring(xml_text)  # noqa: S314
     tags: list[dict[str, Any]] = []
     for response in root.findall(f"{{{DAV_NS}}}response"):
-        propstat = response.find(f"{{{DAV_NS}}}propstat")
-        if propstat is None:
-            continue
-        status_el = propstat.find(f"{{{DAV_NS}}}status")
-        if status_el is None or "200" not in (status_el.text or ""):
-            continue
-        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        prop = find_ok_prop(response)
         if prop is None:
             continue
         tag_id_el = prop.find(f"{{{OC_NS}}}id")

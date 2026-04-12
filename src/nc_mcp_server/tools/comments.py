@@ -8,6 +8,7 @@ from xml.sax.saxutils import escape as xml_escape
 from mcp.server.fastmcp import FastMCP
 
 from ..annotations import ADDITIVE, ADDITIVE_IDEMPOTENT, DESTRUCTIVE, READONLY
+from ..client import find_ok_prop
 from ..permissions import PermissionLevel, require_permission
 from ..state import get_client
 
@@ -86,10 +87,7 @@ def _parse_comments_xml(xml_text: str) -> list[dict[str, Any]]:
         comment_id = parts[-1] if parts else ""
         if not comment_id.isdigit():
             continue
-        propstat = response.find(f"{{{DAV_NS}}}propstat")
-        if propstat is None:
-            continue
-        prop = propstat.find(f"{{{DAV_NS}}}prop")
+        prop = find_ok_prop(response)
         if prop is None:
             continue
         comments.append(_parse_comment_prop(prop, int(comment_id)))
