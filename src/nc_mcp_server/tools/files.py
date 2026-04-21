@@ -1,7 +1,9 @@
 """File management tools — list, read, upload, copy, delete, move, search files via WebDAV."""
 
 import base64
+import binascii
 import json
+import mimetypes
 from xml.sax.saxutils import escape as xml_escape
 
 from mcp.server.fastmcp import FastMCP
@@ -19,6 +21,13 @@ from ..state import get_client, get_config
 
 _IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
 _MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+
+def _resolve_content_type(path: str, content_type: str) -> str:
+    if content_type.strip():
+        return content_type.strip()
+    guessed, _ = mimetypes.guess_type(path)
+    return guessed or "application/octet-stream"
 
 
 def _build_search_xml(user: str, query: str, path: str, limit: int, offset: int, mimetype: str) -> str:
@@ -181,6 +190,9 @@ def _register_write_tools(mcp: FastMCP) -> None:
     async def upload_file(path: str, content: str) -> str:
         """Upload or overwrite a text file in Nextcloud.
 
+        Use this for plain-text content (markdown, source code, CSV, JSON, etc.).
+        For binary files (images, PDFs, archives), use upload_file_binary instead.
+
         Creates the file if it doesn't exist. Overwrites if it does.
 
         Args:
@@ -193,6 +205,39 @@ def _register_write_tools(mcp: FastMCP) -> None:
         client = get_client()
         await client.dav_put(path, content.encode("utf-8"), content_type="text/plain; charset=utf-8")
         return f"File uploaded successfully: {path}"
+
+    @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
+    @require_permission(PermissionLevel.WRITE)
+    async def upload_file_binary(path: str, content_base64: str, content_type: str = "") -> str:
+        """Upload or overwrite a binary file in Nextcloud.
+
+        Use this for images, PDFs, archives, or any non-text content. The content
+        must be base64-encoded. For plain-text files, use upload_file instead.
+
+        Creates the file if it doesn't exist. Overwrites if it does.
+
+        Args:
+            path: Destination path relative to user's root. Example: "Photos/photo.png"
+            content_base64: File bytes encoded as a base64 string. May be empty to
+                create an empty file.
+            content_type: MIME type for the upload request (e.g. "image/png",
+                "application/pdf"). If omitted, inferred from the path extension;
+                falls back to "application/octet-stream". Note: Nextcloud re-derives
+                the stored MIME type from the filename, so this mainly controls the
+                HTTP upload header.
+
+        Returns:
+            Confirmation message with the uploaded byte count.
+        """
+        cleaned = "".join(content_base64.split()) if content_base64 else ""
+        try:
+            data = base64.b64decode(cleaned, validate=True) if cleaned else b""
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError(f"content_base64 is not valid base64: {exc}") from exc
+        resolved = _resolve_content_type(path, content_type)
+        client = get_client()
+        await client.dav_put(path, data, content_type=resolved)
+        return f"File uploaded successfully: {path} ({len(data)} bytes, {resolved})"
 
     @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
     @require_permission(PermissionLevel.WRITE)

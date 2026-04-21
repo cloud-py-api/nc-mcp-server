@@ -37,6 +37,7 @@
 - [x] Contacts tools: list_addressbooks, get_contacts, get_contact, create_contact, update_contact, delete_contact (2026-03-31)
 - [x] Tasks tools: list_task_lists, get_tasks, get_task, create_task, update_task, complete_task, delete_task (2026-04-08)
 - [x] Unified Search tools: list_search_providers, unified_search (2026-04-12)
+- [x] upload_file_binary tool: base64-encoded binary upload with MIME inference (2026-04-21)
 
 ### In Progress
 
@@ -62,7 +63,7 @@
 
 | Module | Tools | Tests |
 |--------|-------|-------|
-| Files | 8 | 47 |
+| Files | 9 | 60 |
 | Users | 5 | 20 |
 | Notifications | 3 | 11 |
 | Talk | 8 | 48 |
@@ -89,4 +90,5 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **97** | **687** |
+| File Helpers | — | 11 |
+| **Total** | **98** | **711** |

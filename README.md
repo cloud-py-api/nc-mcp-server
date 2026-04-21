@@ -30,11 +30,11 @@ export NEXTCLOUD_PASSWORD=your-app-password
 nc-mcp-server
 ```
 
-## 88 Tools Across 18 Nextcloud Apps
+## 98 Tools Across 20 Nextcloud Apps
 
 | Category | Tools | Protocol |
 |----------|-------|----------|
-| [Files](#files) | list, read, search, upload, copy, move, delete | WebDAV |
+| [Files](#files) | list, read, search, upload (text + binary), copy, move, delete | WebDAV |
 | [File Sharing](#file-sharing) | list, get, create, update, delete shares | OCS |
 | [Trashbin](#trashbin) | list, restore, delete item, empty trash | WebDAV |
 | [File Versions](#file-versions) | list, restore versions | WebDAV |
@@ -49,8 +49,10 @@ nc-mcp-server
 | [Announcements](#announcements) | list, create, delete announcements | OCS |
 | [Calendar](#calendar) | list calendars, CRUD events | CalDAV |
 | [Contacts](#contacts) | list address books, CRUD contacts | CardDAV |
+| [Tasks](#tasks) | list lists, CRUD tasks, complete | CalDAV |
 | [Mail](#mail) | accounts, mailboxes, messages, send | REST |
 | [Collectives](#collectives) | list, pages, create, trash, restore | REST |
+| [Unified Search](#unified-search) | list providers, search across apps | OCS |
 | [App Management](#app-management) | list, info, enable, disable apps | OCS |
 
 ## Security: Permission Model
@@ -163,7 +165,8 @@ nc-mcp-server
 | `list_directory` | read | List files and folders in a directory |
 | `get_file` | read | Read a file's content (returns images as MCP ImageContent) |
 | `search_files` | read | Search files by name, MIME type, or path pattern |
-| `upload_file` | write | Upload or overwrite a file |
+| `upload_file` | write | Upload or overwrite a text file |
+| `upload_file_binary` | write | Upload or overwrite a binary file (images, PDFs, archives) from base64-encoded content |
 | `create_directory` | write | Create a new directory |
 | `copy_file` | write | Copy a file or directory |
 | `move_file` | destructive | Move or rename a file |
@@ -299,6 +302,18 @@ nc-mcp-server
 | `update_contact` | write | Update a contact (ETag concurrency control) |
 | `delete_contact` | destructive | Delete a contact |
 
+### Tasks
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_task_lists` | read | List task lists (CalDAV VTODO collections) |
+| `get_tasks` | read | List tasks in a list (with status/completed filters) |
+| `get_task` | read | Get a single task by UID |
+| `create_task` | write | Create a task (due date, priority, categories, etc.) |
+| `update_task` | write | Update a task (partial updates supported) |
+| `complete_task` | write | Mark a task as completed |
+| `delete_task` | destructive | Delete a task |
+
 ### Mail
 
 | Tool | Permission | Description |
@@ -324,6 +339,13 @@ nc-mcp-server
 | `delete_collective_page` | destructive | Permanently delete a trashed page |
 | `restore_collective` | write | Restore a collective from trash |
 | `restore_collective_page` | write | Restore a page from trash |
+
+### Unified Search
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_search_providers` | read | List available search providers (files, mail, talk, etc.) |
+| `unified_search` | read | Search across one or more providers with pagination |
 
 ### App Management
 

@@ -139,6 +139,181 @@ class TestUploadFile:
         assert len(result) == 100_000
 
 
+class TestUploadFileBinary:
+    """Binary upload round-trips through Nextcloud. Payloads are fetched back with
+    raw WebDAV (bypassing `get_file`) so we can assert byte-for-byte equality.
+    """
+
+    @pytest.mark.asyncio
+    async def test_upload_png_round_trip(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/pixel.png",
+            content_base64=_TINY_PNG_B64,
+            content_type="image/png",
+        )
+        got, ct = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/pixel.png")
+        assert got == _TINY_PNG
+        assert ct == "image/png"
+
+    @pytest.mark.asyncio
+    async def test_upload_pdf_round_trip(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        pdf_bytes = (
+            b"%PDF-1.4\n"
+            b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+            b"2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\n"
+            b"xref\n0 3\n0000000000 65535 f\n"
+            b"0000000009 00000 n\n0000000052 00000 n\n"
+            b"trailer<</Size 3/Root 1 0 R>>\nstartxref\n91\n%%EOF\n"
+        )
+        pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/sample.pdf",
+            content_base64=pdf_b64,
+        )
+        got, ct = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/sample.pdf")
+        assert got == pdf_bytes
+        assert ct == "application/pdf"
+
+    @pytest.mark.asyncio
+    async def test_upload_full_byte_range(self, nc_mcp: McpTestHelper) -> None:
+        """Bytes 0x00-0xFF cover the full range that plain upload_file cannot send."""
+        await nc_mcp.create_test_dir()
+        raw = bytes(range(256)) * 8  # 2 KiB of every byte value
+        b64 = base64.b64encode(raw).decode("ascii")
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/all-bytes.bin",
+            content_base64=b64,
+            content_type="application/octet-stream",
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/all-bytes.bin")
+        assert got == raw
+
+    @pytest.mark.asyncio
+    async def test_content_type_inferred_from_extension(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/auto.png",
+            content_base64=_TINY_PNG_B64,
+        )
+        _, ct = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/auto.png")
+        assert ct == "image/png"
+
+    @pytest.mark.asyncio
+    async def test_overwrites_existing_file(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        first = base64.b64encode(b"first-version").decode("ascii")
+        second = base64.b64encode(b"second-version-longer").decode("ascii")
+        await nc_mcp.call("upload_file_binary", path=f"{TEST_BASE_DIR}/ow.bin", content_base64=first)
+        await nc_mcp.call("upload_file_binary", path=f"{TEST_BASE_DIR}/ow.bin", content_base64=second)
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/ow.bin")
+        assert got == b"second-version-longer"
+
+    @pytest.mark.asyncio
+    async def test_empty_content_creates_empty_file(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/empty.bin",
+            content_base64="",
+            content_type="application/octet-stream",
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/empty.bin")
+        assert got == b""
+
+    @pytest.mark.asyncio
+    async def test_result_message_reports_bytes_and_type(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        result = await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/reported.png",
+            content_base64=_TINY_PNG_B64,
+            content_type="image/png",
+        )
+        assert str(len(_TINY_PNG)) in result
+        assert "image/png" in result
+
+    @pytest.mark.asyncio
+    async def test_invalid_base64_raises(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        with pytest.raises(ToolError, match=r"not valid base64"):
+            await nc_mcp.call(
+                "upload_file_binary",
+                path=f"{TEST_BASE_DIR}/bad.bin",
+                content_base64="!!!not-base64!!!",
+            )
+
+    @pytest.mark.asyncio
+    async def test_mime_wrapped_base64_accepted(self, nc_mcp: McpTestHelper) -> None:
+        """MIME-style base64 (76-char line wraps with \\r\\n) should decode cleanly."""
+        await nc_mcp.create_test_dir()
+        raw = bytes(range(200))
+        wrapped = base64.encodebytes(raw).decode("ascii")  # always adds \n every 76 chars
+        assert "\n" in wrapped
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/wrapped.bin",
+            content_base64=wrapped,
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/wrapped.bin")
+        assert got == raw
+
+    @pytest.mark.asyncio
+    async def test_base64_with_stray_whitespace_accepted(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        raw = b"payload with stray whitespace"
+        encoded = base64.b64encode(raw).decode("ascii")
+        dirty = f"  {encoded[:10]} \t \n{encoded[10:]}\r\n"
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/dirty.bin",
+            content_base64=dirty,
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/dirty.bin")
+        assert got == raw
+
+    @pytest.mark.asyncio
+    async def test_uploaded_image_readable_via_get_file(self, nc_mcp: McpTestHelper) -> None:
+        """Binary upload integrates with existing get_file image handling."""
+        await nc_mcp.create_test_dir()
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/readable.png",
+            content_base64=_TINY_PNG_B64,
+        )
+        result = await nc_mcp.mcp._tool_manager.call_tool("get_file", {"path": f"{TEST_BASE_DIR}/readable.png"})
+        assert isinstance(result, list)
+        item = result[0]  # type: ignore[index]
+        assert item.type == "image"  # type: ignore[union-attr]
+        assert item.mimeType == "image/png"  # type: ignore[union-attr]
+        assert base64.b64decode(item.data) == _TINY_PNG  # type: ignore[union-attr]
+
+    @pytest.mark.asyncio
+    async def test_read_only_blocks(self, nc_mcp_read_only: McpTestHelper) -> None:
+        with pytest.raises(ToolError, match=r"[Pp]ermission"):
+            await nc_mcp_read_only.call(
+                "upload_file_binary",
+                path=f"{TEST_BASE_DIR}/denied.png",
+                content_base64=_TINY_PNG_B64,
+            )
+
+    @pytest.mark.asyncio
+    async def test_write_permission_allows(self, nc_mcp_write: McpTestHelper) -> None:
+        await nc_mcp_write.create_test_dir()
+        result = await nc_mcp_write.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/write-ok.png",
+            content_base64=_TINY_PNG_B64,
+            content_type="image/png",
+        )
+        assert "uploaded successfully" in result
+
+
 class TestCreateDirectory:
     @pytest.mark.asyncio
     async def test_create_directory(self, nc_mcp: McpTestHelper) -> None:
