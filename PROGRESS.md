@@ -90,4 +90,5 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **98** | **708** |
+| File Helpers | — | 11 |
+| **Total** | **98** | **711** |

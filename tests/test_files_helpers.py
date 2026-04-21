@@ -27,3 +27,13 @@ class TestResolveContentType:
 
     def test_nested_path_inference(self) -> None:
         assert _resolve_content_type("deep/sub/path/photo.png", "") == "image/png"
+
+    def test_whitespace_only_content_type_falls_back_to_inference(self) -> None:
+        assert _resolve_content_type("photo.png", "   ") == "image/png"
+        assert _resolve_content_type("photo.png", "\t\n") == "image/png"
+
+    def test_whitespace_only_content_type_falls_back_to_octet_stream(self) -> None:
+        assert _resolve_content_type("blob.weirdext", "   ") == "application/octet-stream"
+
+    def test_explicit_content_type_trimmed(self) -> None:
+        assert _resolve_content_type("photo.png", "  image/png  ") == "image/png"

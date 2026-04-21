@@ -24,8 +24,8 @@ _MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
 
 def _resolve_content_type(path: str, content_type: str) -> str:
-    if content_type:
-        return content_type
+    if content_type.strip():
+        return content_type.strip()
     guessed, _ = mimetypes.guess_type(path)
     return guessed or "application/octet-stream"
 
