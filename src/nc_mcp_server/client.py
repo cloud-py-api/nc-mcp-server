@@ -3,7 +3,7 @@
 import contextlib
 import logging
 import xml.etree.ElementTree as ET
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Callable
 from typing import Any
 from urllib.parse import quote as url_quote
 
@@ -310,7 +310,7 @@ class NextcloudClient:
     async def dav_put_stream(
         self,
         path: str,
-        chunks: AsyncIterable[bytes],
+        chunks_factory: Callable[[], AsyncIterable[bytes]],
         content_type: str = "application/octet-stream",
     ) -> None:
         """PUT (upload/overwrite) a file via WebDAV, streaming body from an async iterable.
@@ -319,6 +319,12 @@ class NextcloudClient:
         with Transfer-Encoding: chunked; we deliberately do not set Content-Length
         because nginx rejects (HTTP 400) requests that combine both headers.
 
+        The body is supplied as a factory (not a single iterable) because a cached
+        session cookie can expire mid-run: if the first attempt drains the iterable
+        and returns 401, the generic _do_request retry would send the retry with an
+        empty body — Nextcloud would happily accept the empty PUT and silently
+        truncate the file. Each attempt calls the factory to get a fresh generator.
+
         The read timeout is disabled — a multi-GB upload can legitimately take
         minutes. Connect timeout still applies via the session default.
         """
@@ -326,7 +332,12 @@ class NextcloudClient:
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         headers = {"Content-Type": content_type}
         timeout = Timeout(connect=30, read=None)
-        response = await self._do_request("PUT", url, data=chunks, headers=headers, timeout=timeout)
+
+        session = await self._get_session()
+        response = await session.request("PUT", url, data=chunks_factory(), headers=headers, timeout=timeout)
+        if await self._should_retry_auth(response):
+            session = await self._get_session()
+            response = await session.request("PUT", url, data=chunks_factory(), headers=headers, timeout=timeout)
         _raise_for_status(response, f"Upload file '{path}'")
 
     async def dav_delete(self, path: str) -> None:

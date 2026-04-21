@@ -389,7 +389,7 @@ def _register_upload_from_path_tool(mcp: FastMCP) -> None:
         client = get_client()
         await client.dav_put_stream(
             remote_path,
-            _stream_local_file(resolved),
+            lambda: _stream_local_file(resolved),
             content_type=resolved_ct,
         )
         return f"File uploaded successfully: {remote_path} ({size} bytes, {resolved_ct})"
