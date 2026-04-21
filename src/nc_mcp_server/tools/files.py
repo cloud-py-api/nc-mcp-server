@@ -1,9 +1,12 @@
 """File management tools — list, read, upload, copy, delete, move, search files via WebDAV."""
 
+import asyncio
 import base64
 import binascii
 import json
 import mimetypes
+from collections.abc import AsyncIterator
+from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
 from mcp.server.fastmcp import FastMCP
@@ -21,6 +24,7 @@ from ..state import get_client, get_config
 
 _IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
 _MAX_IMAGE_SIZE = 10 * 1024 * 1024
+_UPLOAD_CHUNK_SIZE = 256 * 1024
 
 
 def _resolve_content_type(path: str, content_type: str) -> str:
@@ -28,6 +32,53 @@ def _resolve_content_type(path: str, content_type: str) -> str:
         return content_type.strip()
     guessed, _ = mimetypes.guess_type(path)
     return guessed or "application/octet-stream"
+
+
+def _resolve_local_upload_path(local_path: str, upload_root: str) -> Path:
+    """Resolve a local path and verify it is inside the configured upload root.
+
+    Symlinks are resolved before the containment check, so a symlink inside the
+    root that points outside is rejected.
+
+    Raises:
+        ValueError: when upload_root is not configured, the path is empty, does
+            not exist, is not a regular file, or resolves to a location outside
+            the upload root.
+    """
+    if not upload_root:
+        raise ValueError(
+            "upload_file_from_path is not configured on this server. "
+            "The administrator must set NEXTCLOUD_MCP_UPLOAD_ROOT to a local directory."
+        )
+    if not local_path or not local_path.strip():
+        raise ValueError("local_path cannot be empty.")
+    try:
+        resolved = Path(local_path).expanduser().resolve(strict=True)
+    except FileNotFoundError:
+        raise ValueError(f"Local file not found: {local_path}") from None
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"Cannot resolve local path '{local_path}': {exc}") from exc
+    root = Path(upload_root).resolve(strict=False)
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise ValueError(f"Path '{local_path}' is outside the configured upload root.") from None
+    if not resolved.is_file():
+        raise ValueError(f"Path is not a regular file: {local_path}")
+    return resolved
+
+
+async def _stream_local_file(path: Path, chunk_size: int = _UPLOAD_CHUNK_SIZE) -> AsyncIterator[bytes]:
+    """Yield chunks from a local file without blocking the event loop."""
+    f = await asyncio.to_thread(path.open, "rb")
+    try:
+        while True:
+            chunk = await asyncio.to_thread(f.read, chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        await asyncio.to_thread(f.close)
 
 
 def _build_search_xml(user: str, query: str, path: str, limit: int, offset: int, mimetype: str) -> str:
@@ -274,6 +325,47 @@ def _register_write_tools(mcp: FastMCP) -> None:
         return f"Directory created: {path}"
 
 
+def _register_upload_from_path_tool(mcp: FastMCP) -> None:
+    @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
+    @require_permission(PermissionLevel.WRITE)
+    async def upload_file_from_path(local_path: str, remote_path: str, content_type: str = "") -> str:
+        """Upload a local file from the server's filesystem to Nextcloud.
+
+        Suitable for large files — the content is streamed in chunks rather than
+        loaded fully into memory. Contrast with upload_file (text-only) and
+        upload_file_binary (whole content passed inline as base64).
+
+        The administrator must enable this tool by setting NEXTCLOUD_MCP_UPLOAD_ROOT
+        to a local directory. Only files inside that directory can be uploaded
+        (symlinks are resolved before the containment check). If the env var is
+        not set, this tool is not registered at all.
+
+        Args:
+            local_path: Path to the local file on the MCP server's filesystem.
+                Must resolve to a regular file inside NEXTCLOUD_MCP_UPLOAD_ROOT.
+            remote_path: Destination path in Nextcloud relative to the user's root.
+                Example: "Photos/vacation.jpg"
+            content_type: Optional MIME type for the upload request. If omitted,
+                inferred from the remote_path extension; falls back to
+                "application/octet-stream". Note: Nextcloud re-derives the stored
+                MIME type from the filename, so this mainly controls the upload header.
+
+        Returns:
+            Confirmation message with the uploaded byte count.
+        """
+        config = get_config()
+        resolved = _resolve_local_upload_path(local_path, config.upload_root)
+        size = resolved.stat().st_size
+        resolved_ct = _resolve_content_type(remote_path, content_type)
+        client = get_client()
+        await client.dav_put_stream(
+            remote_path,
+            _stream_local_file(resolved),
+            content_type=resolved_ct,
+        )
+        return f"File uploaded successfully: {remote_path} ({size} bytes, {resolved_ct})"
+
+
 def _register_destructive_tools(mcp: FastMCP) -> None:
     @mcp.tool(annotations=DESTRUCTIVE)
     @require_permission(PermissionLevel.DESTRUCTIVE)
@@ -314,3 +406,5 @@ def register(mcp: FastMCP) -> None:
     _register_read_tools(mcp)
     _register_write_tools(mcp)
     _register_destructive_tools(mcp)
+    if get_config().upload_root:
+        _register_upload_from_path_tool(mcp)

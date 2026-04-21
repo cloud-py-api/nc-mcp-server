@@ -6,6 +6,9 @@ tool stack including permission checks, argument parsing, and JSON serialization
 
 import base64
 import json
+import os
+import secrets
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -636,3 +639,240 @@ class TestCopyFile:
             "copy_file", source=f"{TEST_BASE_DIR}/w-src.txt", destination=f"{TEST_BASE_DIR}/w-dst.txt"
         )
         assert "Copied" in result
+
+
+class TestUploadFileFromPath:
+    """Upload via local filesystem path, requires NEXTCLOUD_MCP_UPLOAD_ROOT."""
+
+    @pytest.mark.asyncio
+    async def test_tool_not_registered_without_upload_root(self, nc_mcp: McpTestHelper) -> None:
+        """The default nc_mcp fixture has no upload_root — tool is absent."""
+        assert "upload_file_from_path" not in nc_mcp.tool_names()
+
+    @pytest.mark.asyncio
+    async def test_tool_registered_when_upload_root_set(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, _ = nc_mcp_uploads
+        assert "upload_file_from_path" in helper.tool_names()
+
+    @pytest.mark.asyncio
+    async def test_upload_small_text_file_round_trip(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        payload = b"hello from local disk\n"
+        local = root / "note.txt"
+        local.write_bytes(payload)
+        await helper.create_test_dir()
+
+        result = await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/note.txt",
+        )
+        assert "uploaded successfully" in result
+        assert str(len(payload)) in result
+
+        content, content_type = await helper.client.dav_get(f"{TEST_BASE_DIR}/note.txt")
+        assert content == payload
+        assert content_type == "text/plain"
+
+    @pytest.mark.asyncio
+    async def test_upload_binary_file_round_trip(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        local = root / "pixel.png"
+        local.write_bytes(_TINY_PNG)
+        await helper.create_test_dir()
+
+        await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/pixel.png",
+        )
+        content, content_type = await helper.client.dav_get(f"{TEST_BASE_DIR}/pixel.png")
+        assert content == _TINY_PNG
+        assert content_type == "image/png"
+
+    @pytest.mark.asyncio
+    async def test_upload_large_file_streams_correctly(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        """Upload a 2 MiB file — larger than the 256 KiB chunk size, so streaming is exercised."""
+        helper, root = nc_mcp_uploads
+        payload = secrets.token_bytes(2 * 1024 * 1024)
+        local = root / "big.bin"
+        local.write_bytes(payload)
+        await helper.create_test_dir()
+
+        result = await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/big.bin",
+        )
+        assert str(len(payload)) in result
+        content, _ = await helper.client.dav_get(f"{TEST_BASE_DIR}/big.bin")
+        assert content == payload
+
+    @pytest.mark.asyncio
+    async def test_upload_overwrites_existing_remote(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        await helper.create_test_dir()
+        await helper.client.dav_put(f"{TEST_BASE_DIR}/reuse.txt", b"original", content_type="text/plain")
+        local = root / "reuse.txt"
+        local.write_bytes(b"replaced")
+        await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/reuse.txt",
+        )
+        content, _ = await helper.client.dav_get(f"{TEST_BASE_DIR}/reuse.txt")
+        assert content == b"replaced"
+
+    @pytest.mark.asyncio
+    async def test_upload_empty_file(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        local = root / "empty.txt"
+        local.write_bytes(b"")
+        await helper.create_test_dir()
+
+        await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/empty.txt",
+        )
+        content, _ = await helper.client.dav_get(f"{TEST_BASE_DIR}/empty.txt")
+        assert content == b""
+
+    @pytest.mark.asyncio
+    async def test_upload_from_nested_subdirectory(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        sub = root / "nested" / "deep"
+        sub.mkdir(parents=True)
+        local = sub / "x.txt"
+        local.write_bytes(b"deep content")
+        await helper.create_test_dir()
+
+        await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/deep.txt",
+        )
+        content, _ = await helper.client.dav_get(f"{TEST_BASE_DIR}/deep.txt")
+        assert content == b"deep content"
+
+    @pytest.mark.asyncio
+    async def test_rejects_file_outside_upload_root(
+        self, nc_mcp_uploads: tuple[McpTestHelper, Path], tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        helper, _root = nc_mcp_uploads
+        other = tmp_path_factory.mktemp("outside")
+        outside_file = other / "secret.txt"
+        outside_file.write_bytes(b"secret")
+        with pytest.raises(ToolError, match="outside the configured upload root"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(outside_file),
+                remote_path=f"{TEST_BASE_DIR}/secret.txt",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_symlink_pointing_outside(
+        self, nc_mcp_uploads: tuple[McpTestHelper, Path], tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        helper, root = nc_mcp_uploads
+        other = tmp_path_factory.mktemp("outside-target")
+        target = other / "secret.txt"
+        target.write_bytes(b"secret")
+        link = root / "link.txt"
+        link.symlink_to(target)
+        with pytest.raises(ToolError, match="outside the configured upload root"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(link),
+                remote_path=f"{TEST_BASE_DIR}/leaked.txt",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_nonexistent_file(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        missing = root / "does-not-exist.txt"
+        with pytest.raises(ToolError, match="not found"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(missing),
+                remote_path=f"{TEST_BASE_DIR}/x.txt",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_directory_path(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        sub = root / "a-dir"
+        sub.mkdir()
+        with pytest.raises(ToolError, match="not a regular file"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(sub),
+                remote_path=f"{TEST_BASE_DIR}/dir.bin",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_parent_traversal(
+        self, nc_mcp_uploads: tuple[McpTestHelper, Path], tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        helper, root = nc_mcp_uploads
+        other = tmp_path_factory.mktemp("sibling")
+        outside = other / "escape.txt"
+        outside.write_bytes(b"escape")
+        traversal = root / ".." / other.name / "escape.txt"
+        with pytest.raises(ToolError, match="outside the configured upload root"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(traversal),
+                remote_path=f"{TEST_BASE_DIR}/escape.txt",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_fifo(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads
+        fifo = root / "pipe"
+        os.mkfifo(fifo)
+        with pytest.raises(ToolError, match="not a regular file"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(fifo),
+                remote_path=f"{TEST_BASE_DIR}/pipe.bin",
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_empty_local_path(self, nc_mcp_uploads: tuple[McpTestHelper, Path]) -> None:
+        helper, _root = nc_mcp_uploads
+        with pytest.raises(ToolError, match="cannot be empty"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path="",
+                remote_path=f"{TEST_BASE_DIR}/x.txt",
+            )
+
+    @pytest.mark.asyncio
+    async def test_content_type_inferred_from_remote_extension(
+        self, nc_mcp_uploads: tuple[McpTestHelper, Path]
+    ) -> None:
+        """When content_type is empty, it is inferred from the remote_path extension."""
+        helper, root = nc_mcp_uploads
+        local = root / "untyped"  # no extension
+        local.write_bytes(_TINY_PNG)
+        await helper.create_test_dir()
+
+        result = await helper.call(
+            "upload_file_from_path",
+            local_path=str(local),
+            remote_path=f"{TEST_BASE_DIR}/inferred.png",
+        )
+        assert "image/png" in result
+
+    @pytest.mark.asyncio
+    async def test_read_only_permission_blocks(self, nc_mcp_uploads_read_only: tuple[McpTestHelper, Path]) -> None:
+        helper, root = nc_mcp_uploads_read_only
+        local = root / "x.txt"
+        local.write_bytes(b"x")
+        with pytest.raises(ToolError, match=r"[Pp]ermission"):
+            await helper.call(
+                "upload_file_from_path",
+                local_path=str(local),
+                remote_path=f"{TEST_BASE_DIR}/x.txt",
+            )

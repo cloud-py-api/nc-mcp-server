@@ -3,11 +3,12 @@
 import contextlib
 import logging
 import xml.etree.ElementTree as ET
+from collections.abc import AsyncIterable
 from typing import Any
 from urllib.parse import quote as url_quote
 
 import niquests
-from urllib3.util import Retry
+from urllib3.util import Retry, Timeout
 
 from .config import Config
 
@@ -304,6 +305,28 @@ class NextcloudClient:
         user = self._config.user
         url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
         response = await self._do_request("PUT", url, data=content, headers={"Content-Type": content_type})
+        _raise_for_status(response, f"Upload file '{path}'")
+
+    async def dav_put_stream(
+        self,
+        path: str,
+        chunks: AsyncIterable[bytes],
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        """PUT (upload/overwrite) a file via WebDAV, streaming body from an async iterable.
+
+        Use this for files too large to hold fully in memory. niquests sends the body
+        with Transfer-Encoding: chunked; we deliberately do not set Content-Length
+        because nginx rejects (HTTP 400) requests that combine both headers.
+
+        The read timeout is disabled — a multi-GB upload can legitimately take
+        minutes. Connect timeout still applies via the session default.
+        """
+        user = self._config.user
+        url = f"{self._base_url}/remote.php/dav/files/{user}/{path.lstrip('/')}"
+        headers = {"Content-Type": content_type}
+        timeout = Timeout(connect=30, read=None)
+        response = await self._do_request("PUT", url, data=chunks, headers=headers, timeout=timeout)
         _raise_for_status(response, f"Upload file '{path}'")
 
     async def dav_delete(self, path: str) -> None:

@@ -32,9 +32,12 @@ nc-mcp-server
 
 ## 98 Tools Across 20 Nextcloud Apps
 
+A 99th tool, `upload_file_from_path`, is registered only when the operator sets
+`NEXTCLOUD_MCP_UPLOAD_ROOT`. See [Files](#files) for details.
+
 | Category | Tools | Protocol |
 |----------|-------|----------|
-| [Files](#files) | list, read, search, upload (text + binary), copy, move, delete | WebDAV |
+| [Files](#files) | list, read, search, upload (text / binary / from path), copy, move, delete | WebDAV |
 | [File Sharing](#file-sharing) | list, get, create, update, delete shares | OCS |
 | [Trashbin](#trashbin) | list, restore, delete item, empty trash | WebDAV |
 | [File Versions](#file-versions) | list, restore versions | WebDAV |
@@ -100,6 +103,9 @@ export NEXTCLOUD_PASSWORD=your-app-password  # Use an app password, not your mai
 # Optional
 export NEXTCLOUD_MCP_PERMISSIONS=read  # read (default), write, or destructive
 export NEXTCLOUD_MCP_RETRY_MAX=3       # max retries on 429/503 (default: 3, 0 to disable)
+export NEXTCLOUD_MCP_UPLOAD_ROOT=      # unset (default). If set to an absolute directory,
+                                       # enables upload_file_from_path, restricted to files
+                                       # inside that directory (symlinks resolved).
 ```
 
 ### Getting an App Password
@@ -167,10 +173,18 @@ nc-mcp-server
 | `search_files` | read | Search files by name, MIME type, or path pattern |
 | `upload_file` | write | Upload or overwrite a text file |
 | `upload_file_binary` | write | Upload or overwrite a binary file (images, PDFs, archives) from base64-encoded content |
+| `upload_file_from_path` | write | Stream a local file from the server's filesystem — only registered when `NEXTCLOUD_MCP_UPLOAD_ROOT` is set |
 | `create_directory` | write | Create a new directory |
 | `copy_file` | write | Copy a file or directory |
 | `move_file` | destructive | Move or rename a file |
 | `delete_file` | destructive | Delete a file or directory (moves to trash) |
+
+`upload_file_from_path` is off by default because it gives the AI read access
+to the local filesystem. To enable it, set `NEXTCLOUD_MCP_UPLOAD_ROOT` to an
+absolute directory — only files resolving inside that directory (after symlink
+resolution) can be uploaded. This is the right choice when you need to upload
+multi-GB files that would blow past the size limit of an inline `base64` tool
+call; the body is streamed in chunks rather than loaded into memory.
 
 ### File Sharing
 

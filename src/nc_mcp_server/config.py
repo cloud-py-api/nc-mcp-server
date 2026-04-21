@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .permissions import PermissionLevel
 
@@ -21,6 +22,9 @@ class Config:
         NEXTCLOUD_MCP_PORT: Port for HTTP server (default: 8100)
         NEXTCLOUD_MCP_RETRY_MAX: Max retries on 429/503 (default: 3, 0 to disable)
         NEXTCLOUD_MCP_APP_PASSWORD: Set to 'true' when using an app password to skip session caching
+        NEXTCLOUD_MCP_UPLOAD_ROOT: Absolute path to a local directory. When set, enables the
+            upload_file_from_path tool, restricted to files under this directory (symlinks
+            are resolved before the containment check). Unset by default — tool disabled.
     """
 
     nextcloud_url: str = field(default="")
@@ -31,6 +35,7 @@ class Config:
     port: int = field(default=8100)
     retry_max: int = field(default=3)
     is_app_password: bool = field(default=False)
+    upload_root: str = field(default="")
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -62,6 +67,17 @@ class Config:
         else:
             raise ValueError(f"Invalid NEXTCLOUD_MCP_APP_PASSWORD='{app_pw_raw}'. Expected: true/false, 1/0, yes/no.")
 
+        upload_root_raw = os.environ.get("NEXTCLOUD_MCP_UPLOAD_ROOT", "").strip()
+        if upload_root_raw:
+            root = Path(upload_root_raw).expanduser()
+            if not root.exists():
+                raise ValueError(f"NEXTCLOUD_MCP_UPLOAD_ROOT='{upload_root_raw}' does not exist.")
+            if not root.is_dir():
+                raise ValueError(f"NEXTCLOUD_MCP_UPLOAD_ROOT='{upload_root_raw}' is not a directory.")
+            upload_root = str(root.resolve(strict=True))
+        else:
+            upload_root = ""
+
         return cls(
             nextcloud_url=url,
             user=user,
@@ -71,6 +87,7 @@ class Config:
             port=port,
             retry_max=max(0, retry_max),
             is_app_password=is_app_password,
+            upload_root=upload_root,
         )
 
     def validate(self) -> None:

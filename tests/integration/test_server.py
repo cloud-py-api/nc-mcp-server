@@ -1,5 +1,7 @@
 """Integration tests for the MCP server — tool registration, lifecycle, and configuration."""
 
+from pathlib import Path
+
 import pytest
 
 from nc_mcp_server.config import Config
@@ -158,5 +160,27 @@ class TestServerCreation:
         monkeypatch.setenv("NEXTCLOUD_URL", "http://nextcloud.ncmcp")
         monkeypatch.setenv("NEXTCLOUD_USER", "admin")
         monkeypatch.setenv("NEXTCLOUD_PASSWORD", "admin")
+        monkeypatch.delenv("NEXTCLOUD_MCP_UPLOAD_ROOT", raising=False)
         mcp = create_server()
         assert len(mcp._tool_manager.list_tools()) == len(EXPECTED_TOOLS)
+
+    @pytest.mark.asyncio
+    async def test_upload_from_path_tool_gated_on_upload_root(self, nc_config: Config, tmp_path: Path) -> None:
+        """upload_file_from_path is registered only when upload_root is configured."""
+        mcp_no_root = create_server(nc_config)
+        names_no_root = {t.name for t in mcp_no_root._tool_manager.list_tools()}
+        assert "upload_file_from_path" not in names_no_root
+        assert len(names_no_root) == len(EXPECTED_TOOLS)
+
+        resolved_root = str(tmp_path)  # tmp_path is already absolute; tool resolves symlinks at call time
+        config_with_root = Config(
+            nextcloud_url=nc_config.nextcloud_url,
+            user=nc_config.user,
+            password=nc_config.password,
+            permission_level=nc_config.permission_level,
+            upload_root=resolved_root,
+        )
+        mcp_with_root = create_server(config_with_root)
+        names_with_root = {t.name for t in mcp_with_root._tool_manager.list_tools()}
+        assert "upload_file_from_path" in names_with_root
+        assert len(names_with_root) == len(EXPECTED_TOOLS) + 1

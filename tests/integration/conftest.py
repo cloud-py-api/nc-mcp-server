@@ -3,6 +3,7 @@
 import contextlib
 import os
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 import pytest
 from mcp.server.fastmcp import FastMCP
@@ -62,7 +63,10 @@ class McpTestHelper:
         await self.client.dav_put(path, content.encode("utf-8"), content_type="text/plain; charset=utf-8")
 
 
-def _get_integration_config(permission: PermissionLevel = PermissionLevel.DESTRUCTIVE) -> Config:
+def _get_integration_config(
+    permission: PermissionLevel = PermissionLevel.DESTRUCTIVE,
+    upload_root: str = "",
+) -> Config:
     """Build config from environment, with defaults for local dev."""
     return Config(
         nextcloud_url=os.environ.get("NEXTCLOUD_URL", "http://nextcloud.ncmcp"),
@@ -70,6 +74,7 @@ def _get_integration_config(permission: PermissionLevel = PermissionLevel.DESTRU
         password=os.environ.get("NEXTCLOUD_PASSWORD", "admin"),
         permission_level=permission,
         is_app_password=os.environ.get("NEXTCLOUD_MCP_APP_PASSWORD", "").lower() in ("true", "1", "yes"),
+        upload_root=upload_root,
     )
 
 
@@ -117,6 +122,33 @@ async def nc_mcp_write() -> AsyncGenerator[McpTestHelper]:
     mcp = create_server(config)
     helper = McpTestHelper(mcp, get_client())
     yield helper
+    await helper.client.close()
+
+
+def _build_upload_config(root: Path, permission: PermissionLevel) -> Config:
+    """Resolve an upload root outside the async fixture to satisfy ASYNC240."""
+    return _get_integration_config(permission, upload_root=str(root.resolve()))
+
+
+@pytest.fixture
+async def nc_mcp_uploads(tmp_path: Path) -> AsyncGenerator[tuple[McpTestHelper, Path]]:
+    """MCP server with NEXTCLOUD_MCP_UPLOAD_ROOT=tmp_path — enables upload_file_from_path."""
+    config = _build_upload_config(tmp_path, PermissionLevel.DESTRUCTIVE)
+    config.validate()
+    mcp = create_server(config)
+    helper = McpTestHelper(mcp, get_client())
+    yield helper, Path(config.upload_root)
+    await helper.client.close()
+
+
+@pytest.fixture
+async def nc_mcp_uploads_read_only(tmp_path: Path) -> AsyncGenerator[tuple[McpTestHelper, Path]]:
+    """Read-only MCP server with upload_root set — verifies permission gate on upload_file_from_path."""
+    config = _build_upload_config(tmp_path, PermissionLevel.READ)
+    config.validate()
+    mcp = create_server(config)
+    helper = McpTestHelper(mcp, get_client())
+    yield helper, Path(config.upload_root)
     await helper.client.close()
 
 

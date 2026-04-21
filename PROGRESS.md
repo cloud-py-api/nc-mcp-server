@@ -38,6 +38,7 @@
 - [x] Tasks tools: list_task_lists, get_tasks, get_task, create_task, update_task, complete_task, delete_task (2026-04-08)
 - [x] Unified Search tools: list_search_providers, unified_search (2026-04-12)
 - [x] upload_file_binary tool: base64-encoded binary upload with MIME inference (2026-04-21)
+- [x] upload_file_from_path tool: stream a local file to Nextcloud. Off by default; enabled via NEXTCLOUD_MCP_UPLOAD_ROOT, restricted to files inside that root (symlinks resolved) (2026-04-21)
 
 ### In Progress
 
@@ -63,7 +64,7 @@
 
 | Module | Tools | Tests |
 |--------|-------|-------|
-| Files | 9 | 60 |
+| Files | 10 | 77 |
 | Users | 5 | 20 |
 | Notifications | 3 | 11 |
 | Talk | 8 | 48 |
@@ -84,11 +85,14 @@
 | Tasks | 7 | 48 |
 | Search | 2 | 17 |
 | User Permissions | — | 15 |
-| Server | — | 7 |
+| Server | — | 8 |
 | Permissions | — | 34 |
 | Errors | — | 16 |
 | Client | — | 29 |
-| Config | — | 17 |
+| Config | — | 24 |
 | State | — | 2 |
-| File Helpers | — | 11 |
-| **Total** | **98** | **711** |
+| File Helpers | — | 26 |
+| **Total** | **99** | **751** |
+
+Files shows 10, but one (`upload_file_from_path`) is only registered when
+`NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 98 tools.
