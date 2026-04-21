@@ -229,8 +229,9 @@ def _register_write_tools(mcp: FastMCP) -> None:
         Returns:
             Confirmation message with the uploaded byte count.
         """
+        cleaned = "".join(content_base64.split()) if content_base64 else ""
         try:
-            data = base64.b64decode(content_base64, validate=True) if content_base64 else b""
+            data = base64.b64decode(cleaned, validate=True) if cleaned else b""
         except (binascii.Error, ValueError) as exc:
             raise ValueError(f"content_base64 is not valid base64: {exc}") from exc
         resolved = _resolve_content_type(path, content_type)

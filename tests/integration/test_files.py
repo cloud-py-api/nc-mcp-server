@@ -249,6 +249,35 @@ class TestUploadFileBinary:
             )
 
     @pytest.mark.asyncio
+    async def test_mime_wrapped_base64_accepted(self, nc_mcp: McpTestHelper) -> None:
+        """MIME-style base64 (76-char line wraps with \\r\\n) should decode cleanly."""
+        await nc_mcp.create_test_dir()
+        raw = bytes(range(200))
+        wrapped = base64.encodebytes(raw).decode("ascii")  # always adds \n every 76 chars
+        assert "\n" in wrapped
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/wrapped.bin",
+            content_base64=wrapped,
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/wrapped.bin")
+        assert got == raw
+
+    @pytest.mark.asyncio
+    async def test_base64_with_stray_whitespace_accepted(self, nc_mcp: McpTestHelper) -> None:
+        await nc_mcp.create_test_dir()
+        raw = b"payload with stray whitespace"
+        encoded = base64.b64encode(raw).decode("ascii")
+        dirty = f"  {encoded[:10]} \t \n{encoded[10:]}\r\n"
+        await nc_mcp.call(
+            "upload_file_binary",
+            path=f"{TEST_BASE_DIR}/dirty.bin",
+            content_base64=dirty,
+        )
+        got, _ = await nc_mcp.client.dav_get(f"{TEST_BASE_DIR}/dirty.bin")
+        assert got == raw
+
+    @pytest.mark.asyncio
     async def test_uploaded_image_readable_via_get_file(self, nc_mcp: McpTestHelper) -> None:
         """Binary upload integrates with existing get_file image handling."""
         await nc_mcp.create_test_dir()

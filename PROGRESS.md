@@ -63,7 +63,7 @@
 
 | Module | Tools | Tests |
 |--------|-------|-------|
-| Files | 9 | 58 |
+| Files | 9 | 60 |
 | Users | 5 | 20 |
 | Notifications | 3 | 11 |
 | Talk | 8 | 48 |
@@ -90,4 +90,4 @@
 | Client | — | 29 |
 | Config | — | 17 |
 | State | — | 2 |
-| **Total** | **98** | **706** |
+| **Total** | **98** | **708** |
