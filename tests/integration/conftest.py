@@ -203,7 +203,7 @@ async def _cleanup(client: NextcloudClient) -> None:
             if not deleted:
                 break
     with contextlib.suppress(Exception):
-        forms = await client.ocs_get("apps/forms/api/v3/forms", params={"type": "owned"})
+        forms: list[dict[str, object]] = await client.ocs_get("apps/forms/api/v3/forms", params={"type": "owned"})
         for form in forms or []:
             title = str(form.get("title", ""))
             if title.startswith("mcp-test-"):

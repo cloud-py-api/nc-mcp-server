@@ -1,6 +1,7 @@
 """Integration tests for Forms tools against a real Nextcloud instance."""
 
 import json
+from typing import Any
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -12,12 +13,13 @@ from .conftest import McpTestHelper
 pytestmark = pytest.mark.integration
 
 
-async def _make_form(nc_mcp: McpTestHelper, title: str, **extra: object) -> dict:
+async def _make_form(nc_mcp: McpTestHelper, title: str, **extra: Any) -> dict[str, Any]:
     """Create a form and set its title (and optional other fields). Returns the form dict."""
-    created = json.loads(await nc_mcp.call("create_form"))
-    kv: dict[str, object] = {"title": title}
+    created: dict[str, Any] = json.loads(await nc_mcp.call("create_form"))
+    kv: dict[str, Any] = {"title": title}
     kv.update(extra)
-    return json.loads(await nc_mcp.call("update_form", form_id=created["id"], key_value_pairs=kv))
+    updated: dict[str, Any] = json.loads(await nc_mcp.call("update_form", form_id=created["id"], key_value_pairs=kv))
+    return updated
 
 
 class TestListForms:
