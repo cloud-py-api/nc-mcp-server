@@ -33,9 +33,18 @@ class TestListForms:
 
     @pytest.mark.asyncio
     async def test_list_without_type_returns_list(self, nc_mcp: McpTestHelper) -> None:
-        await _make_form(nc_mcp, "mcp-test-list-all")
+        form = await _make_form(nc_mcp, "mcp-test-list-all")
         forms = json.loads(await nc_mcp.call("list_forms"))
         assert isinstance(forms, list)
+        assert any(f["id"] == form["id"] for f in forms), "owned form should appear in default (merged) list"
+
+    @pytest.mark.asyncio
+    async def test_list_default_is_deduped(self, nc_mcp: McpTestHelper) -> None:
+        """The default merged list fans out to both owned+shared; a form must appear once."""
+        form = await _make_form(nc_mcp, "mcp-test-list-dedup")
+        forms = json.loads(await nc_mcp.call("list_forms"))
+        matches = [f for f in forms if f["id"] == form["id"]]
+        assert len(matches) == 1, "form id appeared more than once in merged list"
 
 
 class TestFormLifecycle:
@@ -95,6 +104,27 @@ class TestQuestions:
         form = await _make_form(nc_mcp, "mcp-test-q-bad")
         with pytest.raises((ToolError, ValueError), match=r"[Ii]nvalid question_type"):
             await nc_mcp.call("create_question", form_id=form["id"], question_type="invalid_type", text="x")
+
+    @pytest.mark.asyncio
+    async def test_create_question_rejects_datetime(self, nc_mcp: McpTestHelper) -> None:
+        """Nextcloud no longer supports 'datetime' — our validation rejects it client-side."""
+        form = await _make_form(nc_mcp, "mcp-test-q-datetime")
+        with pytest.raises((ToolError, ValueError), match=r"[Ii]nvalid question_type"):
+            await nc_mcp.call("create_question", form_id=form["id"], question_type="datetime", text="x")
+
+    @pytest.mark.asyncio
+    async def test_create_question_linearscale(self, nc_mcp: McpTestHelper) -> None:
+        form = await _make_form(nc_mcp, "mcp-test-q-linearscale")
+        q = json.loads(
+            await nc_mcp.call("create_question", form_id=form["id"], question_type="linearscale", text="Rate")
+        )
+        assert q["type"] == "linearscale"
+
+    @pytest.mark.asyncio
+    async def test_create_question_color(self, nc_mcp: McpTestHelper) -> None:
+        form = await _make_form(nc_mcp, "mcp-test-q-color")
+        q = json.loads(await nc_mcp.call("create_question", form_id=form["id"], question_type="color", text="Favorite"))
+        assert q["type"] == "color"
 
     @pytest.mark.asyncio
     async def test_list_questions_includes_created(self, nc_mcp: McpTestHelper) -> None:

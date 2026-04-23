@@ -368,7 +368,7 @@ call; the body is streamed in chunks rather than loaded into memory.
 
 | Tool | Permission | Description |
 |------|-----------|-------------|
-| `list_forms` | read | List forms (filter by ownership: "owned" or "shared"; omit for both) |
+| `list_forms` | read | List forms (filter by ownership: "owned" or "shared"; omit to merge both) |
 | `get_form` | read | Get a form with questions, options, shares |
 | `list_questions` | read | List questions on a form |
 | `get_question` | read | Get a single question |

@@ -17,11 +17,26 @@ QUESTION_TYPES = {
     "dropdown",
     "date",
     "time",
-    "datetime",
     "file",
     "grid",
+    "color",
+    "linearscale",
 }
 GRID_SUBTYPES = {"radio", "checkbox", "number"}
+
+
+def _dedupe_forms_by_id(*batches: list[Any]) -> list[Any]:
+    """Merge form lists by id, preserving order and dropping duplicates."""
+    seen: set[int] = set()
+    merged: list[Any] = []
+    for batch in batches:
+        for form in batch:
+            fid = form.get("id") if isinstance(form, dict) else None
+            if fid is None or fid in seen:
+                continue
+            seen.add(fid)
+            merged.append(form)
+    return merged
 
 
 def _register_read_tools(mcp: FastMCP) -> None:
@@ -31,8 +46,10 @@ def _register_read_tools(mcp: FastMCP) -> None:
         """List forms visible to the current user.
 
         Args:
-            ownership: Filter by ownership. One of: "owned" (forms I created),
-                "shared" (forms shared with me). Omit to get both merged.
+            ownership: Filter. One of: "owned" (forms I created), "shared"
+                (forms shared with me). Omit to get both — the Nextcloud
+                endpoint takes one filter at a time, so this tool calls it
+                twice and merges the results when omitted.
 
         Returns:
             JSON array of form summaries. Each entry includes id, hash, title,
@@ -40,9 +57,12 @@ def _register_read_tools(mcp: FastMCP) -> None:
             Call get_form(id) for full details including questions.
         """
         client = get_client()
-        params = {"type": ownership} if ownership else None
-        data = await client.ocs_get("apps/forms/api/v3/forms", params=params)
-        return json.dumps(data)
+        if ownership is not None:
+            data = await client.ocs_get("apps/forms/api/v3/forms", params={"type": ownership})
+            return json.dumps(data)
+        owned = await client.ocs_get("apps/forms/api/v3/forms", params={"type": "owned"})
+        shared = await client.ocs_get("apps/forms/api/v3/forms", params={"type": "shared"})
+        return json.dumps(_dedupe_forms_by_id(owned, shared))
 
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
@@ -62,6 +82,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
         data = await client.ocs_get(f"apps/forms/api/v3/forms/{form_id}")
         return json.dumps(data)
 
+
+def _register_question_reads(mcp: FastMCP) -> None:
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
     async def list_questions(form_id: int) -> str:
@@ -94,6 +116,8 @@ def _register_read_tools(mcp: FastMCP) -> None:
         data = await client.ocs_get(f"apps/forms/api/v3/forms/{form_id}/questions/{question_id}")
         return json.dumps(data)
 
+
+def _register_submission_reads(mcp: FastMCP) -> None:
     @mcp.tool(annotations=READONLY)
     @require_permission(PermissionLevel.READ)
     async def list_submissions(
@@ -208,8 +232,9 @@ def _register_question_writes(mcp: FastMCP) -> None:
             form_id: Numeric form id.
             question_type: One of: "short" (single-line text), "long"
                 (multi-line text), "multiple" (checkbox), "multiple_unique"
-                (radio), "dropdown", "date", "time", "datetime", "file",
-                "grid". For "grid", pass subtype.
+                (radio), "dropdown", "date", "time", "file", "grid", "color",
+                "linearscale". "datetime" is rejected by Nextcloud — use
+                separate "date" and "time" questions.
             text: Question text. Defaults to empty; update_question can set it later.
             subtype: For question_type="grid" only, the cell type: "radio",
                 "checkbox", or "number".
@@ -289,7 +314,10 @@ def _register_option_writes(mcp: FastMCP) -> None:
 
         Args:
             form_id: Numeric form id.
-            question_id: Numeric question id. Must be a choice-type question.
+            question_id: Numeric question id. Intended for choice-type
+                questions (dropdown, multiple, multiple_unique, linearscale,
+                grid); options on other types are accepted by the server but
+                have no effect.
             option_texts: Array of option labels to create. Each creates a
                 separate option in order.
 
@@ -590,6 +618,8 @@ def _register_destructive_tools(mcp: FastMCP) -> None:
 def register(mcp: FastMCP) -> None:
     """Register Forms tools with the MCP server."""
     _register_read_tools(mcp)
+    _register_question_reads(mcp)
+    _register_submission_reads(mcp)
     _register_form_writes(mcp)
     _register_question_writes(mcp)
     _register_option_writes(mcp)
