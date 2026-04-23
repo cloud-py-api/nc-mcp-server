@@ -441,7 +441,7 @@ def _register_submission_writes(mcp: FastMCP) -> None:
             f"apps/forms/api/v3/forms/{form_id}/submissions",
             json_data=body,
         )
-        return json.dumps(data) if data else '{"status": "submitted"}'
+        return '{"status": "submitted"}' if data is None else json.dumps(data)
 
     @mcp.tool(annotations=ADDITIVE_IDEMPOTENT)
     @require_permission(PermissionLevel.WRITE)
