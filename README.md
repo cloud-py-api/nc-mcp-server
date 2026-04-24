@@ -54,8 +54,8 @@ A 127th tool, `upload_file_from_path`, is registered only when the operator sets
 | [Calendar](#calendar) | list calendars, CRUD events | CalDAV |
 | [Contacts](#contacts) | list address books, CRUD contacts | CardDAV |
 | [Tasks](#tasks) | list lists, CRUD tasks, complete | CalDAV |
-| [Mail](#mail) | accounts, mailboxes, messages, send | REST |
-| [Collectives](#collectives) | list, pages, create, trash, restore | REST |
+| [Mail](#mail) | accounts, mailboxes, messages, send | OCS |
+| [Collectives](#collectives) | list, pages, create, trash, restore | OCS |
 | [Forms](#forms) | CRUD forms, questions, options, shares, submissions + export | OCS |
 | [Unified Search](#unified-search) | list providers, search across apps | OCS |
 | [App Management](#app-management) | list, info, enable, disable apps | OCS |
