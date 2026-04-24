@@ -116,7 +116,7 @@ class TestCircleLifecycle:
     async def test_create_sets_owner_to_caller(self, nc_mcp: McpTestHelper) -> None:
         created = json.loads(await nc_mcp.call("create_circle", name="mcp-test-circle-create"))
         assert created["name"] == "mcp-test-circle-create"
-        assert created["initiator"]["userId"] == "admin"
+        assert created["initiator"]["userId"] == get_config().user
         assert created["initiator"]["level"] == 9  # owner
 
     @pytest.mark.asyncio
@@ -176,9 +176,10 @@ class TestMembers:
         circle = await _make_circle(nc_mcp, "mcp-test-circle-owner")
         members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
         assert isinstance(members, list)
-        admin_member = next((m for m in members if m.get("userId") == "admin"), None)
-        assert admin_member is not None, "owner should be in members"
-        assert admin_member["level"] == 9
+        owner_id = get_config().user
+        owner_member = next((m for m in members if m.get("userId") == owner_id), None)
+        assert owner_member is not None, "owner should be in members"
+        assert owner_member["level"] == 9
 
     @pytest.mark.asyncio
     async def test_add_and_list_member(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
