@@ -97,8 +97,8 @@
 | File Helpers | — | 26 |
 | File Reminders | 3 | 20 |
 | Forms | 25 | 34 |
-| Circles | 14 | 20 |
-| **Total** | **141** | **825** |
+| Circles | 14 | 23 |
+| **Total** | **141** | **828** |
 
 Files shows 10, but one (`upload_file_from_path`) is only registered when
 `NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 140 tools.

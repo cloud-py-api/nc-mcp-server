@@ -2,20 +2,49 @@
 
 import contextlib
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 
+import niquests
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
 from nc_mcp_server.client import NextcloudClient, NextcloudError
 from nc_mcp_server.config import Config
+from nc_mcp_server.state import get_client, get_config, set_state
 
 from .conftest import McpTestHelper
 
 pytestmark = pytest.mark.integration
 
 CIRCLE_TEST_USER = "mcp-circle-test-user"
+CIRCLE_TEST_PWD = "mcp-Circle-Test-PWD-9X!"
+
+
+@pytest.fixture(scope="session")
+def _circles_available(_cleanup_config: Config) -> bool:
+    """Probe whether the Circles app is enabled on the target Nextcloud.
+
+    Sync-only check so we can return a plain bool at session scope without
+    fighting pytest-asyncio's per-test event loop.
+    """
+    try:
+        resp = niquests.get(
+            f"{_cleanup_config.nextcloud_url}/ocs/v2.php/apps/circles/circles",
+            auth=(_cleanup_config.user, _cleanup_config.password),
+            headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+            timeout=5,
+        )
+    except (OSError, niquests.exceptions.RequestException):
+        return False
+    return resp.ok
+
+
+@pytest.fixture(autouse=True)
+def _skip_if_no_circles(_circles_available: bool) -> None:
+    """Skip every Circles test when the app isn't enabled on the target instance."""
+    if not _circles_available:
+        pytest.skip("Circles app is not enabled on this Nextcloud instance")
 
 
 @pytest.fixture
@@ -25,12 +54,39 @@ async def circle_peer(nc_config: Config) -> AsyncGenerator[str]:
     with contextlib.suppress(Exception):
         await client.ocs_post(
             "cloud/users",
-            data={"userid": CIRCLE_TEST_USER, "password": "mcp-Circle-Test-PWD-9X!"},
+            data={"userid": CIRCLE_TEST_USER, "password": CIRCLE_TEST_PWD},
         )
     yield CIRCLE_TEST_USER
     with contextlib.suppress(Exception):
         await client.ocs_delete(f"cloud/users/{CIRCLE_TEST_USER}")
     await client.close()
+
+
+@contextlib.asynccontextmanager
+async def _as_peer(user_id: str, password: str) -> AsyncIterator[None]:
+    """Temporarily swap the global state so tool calls authenticate as the given user.
+
+    Restores the prior state on exit. Tools (`create_server`, `get_client`) read the
+    client from module-global state, so swapping it lets the existing McpTestHelper
+    exercise real tools under a different user's credentials without needing a
+    second server instance.
+    """
+    admin_client = get_client()
+    admin_config = get_config()
+    peer_config = Config(
+        nextcloud_url=admin_config.nextcloud_url,
+        user=user_id,
+        password=password,
+        permission_level=admin_config.permission_level,
+    )
+    peer_config.validate()
+    peer_client = NextcloudClient(peer_config)
+    set_state(peer_client, peer_config)
+    try:
+        yield
+    finally:
+        set_state(admin_client, admin_config)
+        await peer_client.close()
 
 
 async def _make_circle(nc_mcp: McpTestHelper, name: str) -> dict[str, Any]:
@@ -52,7 +108,7 @@ class TestListCircles:
         for i in range(3):
             await _make_circle(nc_mcp, f"mcp-test-circle-page-{i}")
         circles: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circles", limit=2))
-        assert len(circles) <= 2
+        assert len(circles) == 2
 
 
 class TestCircleLifecycle:
@@ -187,18 +243,26 @@ class TestMembers:
 
 class TestJoinLeave:
     @pytest.mark.asyncio
-    async def test_leave_as_non_owner(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
-        """Admin adds peer then removes peer — membership disappears."""
-        admin = nc_mcp
-        circle = json.loads(await admin.call("create_circle", name="mcp-test-circle-leave"))
-        peer_member = json.loads(await admin.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
-        # Admin removes peer (equivalent to peer leaving, same effect)
-        await admin.call(
-            "remove_circle_member",
-            circle_id=circle["id"],
-            member_id=peer_member["id"],
-        )
-        members: list[dict[str, Any]] = json.loads(await admin.call("list_circle_members", circle_id=circle["id"]))
+    async def test_join_open_circle(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
+        """Admin creates an OPEN circle; peer calls join_circle and appears in members."""
+        circle = await _make_circle(nc_mcp, "mcp-test-circle-open-join")
+        # 24 = VISIBLE(8) | OPEN(16) — required for peer to join via join_circle
+        await nc_mcp.call("update_circle_config", circle_id=circle["id"], config=24)
+        async with _as_peer(circle_peer, CIRCLE_TEST_PWD):
+            joined = json.loads(await nc_mcp.call("join_circle", circle_id=circle["id"]))
+            assert joined["userId"] == circle_peer
+            assert joined["status"] == "Member"
+        members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
+        assert any(m.get("userId") == circle_peer for m in members)
+
+    @pytest.mark.asyncio
+    async def test_leave_as_member(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
+        """Admin adds peer; peer calls leave_circle; peer is gone from member list."""
+        circle = await _make_circle(nc_mcp, "mcp-test-circle-leave")
+        await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer)
+        async with _as_peer(circle_peer, CIRCLE_TEST_PWD):
+            await nc_mcp.call("leave_circle", circle_id=circle["id"])
+        members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
         assert not any(m.get("userId") == circle_peer for m in members)
 
 
