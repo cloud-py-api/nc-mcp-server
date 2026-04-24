@@ -1,16 +1,36 @@
 """Integration tests for Circles (Teams) tools against a real Nextcloud instance."""
 
+import contextlib
 import json
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
-from nc_mcp_server.client import NextcloudError
+from nc_mcp_server.client import NextcloudClient, NextcloudError
+from nc_mcp_server.config import Config
 
 from .conftest import McpTestHelper
 
 pytestmark = pytest.mark.integration
+
+CIRCLE_TEST_USER = "mcp-circle-test-user"
+
+
+@pytest.fixture
+async def circle_peer(nc_config: Config) -> AsyncGenerator[str]:
+    """Ensure a second user exists for membership tests. Yields the userid."""
+    client = NextcloudClient(nc_config)
+    with contextlib.suppress(Exception):
+        await client.ocs_post(
+            "cloud/users",
+            data={"userid": CIRCLE_TEST_USER, "password": "mcp-Circle-Test-PWD-9X!"},
+        )
+    yield CIRCLE_TEST_USER
+    with contextlib.suppress(Exception):
+        await client.ocs_delete(f"cloud/users/{CIRCLE_TEST_USER}")
+    await client.close()
 
 
 async def _make_circle(nc_mcp: McpTestHelper, name: str) -> dict[str, Any]:
@@ -105,12 +125,12 @@ class TestMembers:
         assert admin_member["level"] == 9
 
     @pytest.mark.asyncio
-    async def test_add_and_list_member(self, nc_mcp: McpTestHelper) -> None:
+    async def test_add_and_list_member(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
         circle = await _make_circle(nc_mcp, "mcp-test-circle-add-member")
-        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id="bob"))
-        assert added["userId"] == "bob"
+        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
+        assert added["userId"] == circle_peer
         members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
-        assert any(m.get("userId") == "bob" for m in members)
+        assert any(m.get("userId") == circle_peer for m in members)
 
     @pytest.mark.asyncio
     async def test_add_member_rejects_bad_type(self, nc_mcp: McpTestHelper) -> None:
@@ -119,14 +139,14 @@ class TestMembers:
             await nc_mcp.call(
                 "add_circle_member",
                 circle_id=circle["id"],
-                user_id="bob",
+                user_id="anyone",
                 member_type="bogus",
             )
 
     @pytest.mark.asyncio
-    async def test_update_member_level(self, nc_mcp: McpTestHelper) -> None:
+    async def test_update_member_level(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
         circle = await _make_circle(nc_mcp, "mcp-test-circle-promote")
-        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id="bob"))
+        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
         await nc_mcp.call(
             "update_circle_member_level",
             circle_id=circle["id"],
@@ -134,13 +154,13 @@ class TestMembers:
             level="moderator",
         )
         members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
-        bob = next(m for m in members if m.get("userId") == "bob")
-        assert bob["level"] == 4
+        peer = next(m for m in members if m.get("userId") == circle_peer)
+        assert peer["level"] == 4
 
     @pytest.mark.asyncio
-    async def test_update_level_rejects_bad_value(self, nc_mcp: McpTestHelper) -> None:
+    async def test_update_level_rejects_bad_value(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
         circle = await _make_circle(nc_mcp, "mcp-test-circle-bad-level")
-        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id="bob"))
+        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
         with pytest.raises((ToolError, ValueError), match=r"[Ii]nvalid level"):
             await nc_mcp.call(
                 "update_circle_member_level",
@@ -150,9 +170,9 @@ class TestMembers:
             )
 
     @pytest.mark.asyncio
-    async def test_remove_member(self, nc_mcp: McpTestHelper) -> None:
+    async def test_remove_member(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
         circle = await _make_circle(nc_mcp, "mcp-test-circle-kick")
-        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id="bob"))
+        added = json.loads(await nc_mcp.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
         result = json.loads(
             await nc_mcp.call(
                 "remove_circle_member",
@@ -162,34 +182,32 @@ class TestMembers:
         )
         assert result == {"removed_member_id": added["id"]}
         members: list[dict[str, Any]] = json.loads(await nc_mcp.call("list_circle_members", circle_id=circle["id"]))
-        assert not any(m.get("userId") == "bob" for m in members)
+        assert not any(m.get("userId") == circle_peer for m in members)
 
 
 class TestJoinLeave:
     @pytest.mark.asyncio
-    async def test_leave_as_non_owner(self, nc_mcp: McpTestHelper) -> None:
-        """Alice creates, admin is added, admin leaves — membership disappears."""
+    async def test_leave_as_non_owner(self, nc_mcp: McpTestHelper, circle_peer: str) -> None:
+        """Admin adds peer then removes peer — membership disappears."""
         admin = nc_mcp
         circle = json.loads(await admin.call("create_circle", name="mcp-test-circle-leave"))
-        # Make the circle joinable so owner can add bob then bob can leave
-        # Admin adds bob
-        bob_member = json.loads(await admin.call("add_circle_member", circle_id=circle["id"], user_id="bob"))
-        # Admin removes bob (equivalent to bob leaving, same effect, without needing a second client)
+        peer_member = json.loads(await admin.call("add_circle_member", circle_id=circle["id"], user_id=circle_peer))
+        # Admin removes peer (equivalent to peer leaving, same effect)
         await admin.call(
             "remove_circle_member",
             circle_id=circle["id"],
-            member_id=bob_member["id"],
+            member_id=peer_member["id"],
         )
         members: list[dict[str, Any]] = json.loads(await admin.call("list_circle_members", circle_id=circle["id"]))
-        assert not any(m.get("userId") == "bob" for m in members)
+        assert not any(m.get("userId") == circle_peer for m in members)
 
 
 class TestSearch:
     @pytest.mark.asyncio
-    async def test_search_finds_user(self, nc_mcp: McpTestHelper) -> None:
-        """Search by a common user id should return at least one hit."""
+    async def test_search_returns_list(self, nc_mcp: McpTestHelper) -> None:
+        """Search should return a JSON list regardless of matches."""
         await _make_circle(nc_mcp, "mcp-test-circle-search")
-        results = json.loads(await nc_mcp.call("search_circles", term="bob"))
+        results = json.loads(await nc_mcp.call("search_circles", term="admin"))
         assert isinstance(results, list)
 
 
