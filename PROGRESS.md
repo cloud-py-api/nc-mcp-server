@@ -41,6 +41,7 @@
 - [x] upload_file_from_path tool: stream a local file to Nextcloud. Off by default; enabled via NEXTCLOUD_MCP_UPLOAD_ROOT, restricted to files inside that root (symlinks resolved) (2026-04-21)
 - [x] File Reminders tools: get_file_reminder, set_file_reminder, remove_file_reminder (2026-04-22)
 - [x] Forms tools: 25 tools covering forms, questions, options, shares, submissions CRUD + export (2026-04-23)
+- [x] Circles (Teams) tools: 14 tools — list/CRUD circles, member add/remove/level, search, join/leave (2026-04-24)
 
 ### In Progress
 
@@ -48,7 +49,7 @@
 (none)
 
 ### Next Up
-- Weather Status (fully OCS). Tables skipped for now — OCS v2 API is incomplete (rows/columns/views require v1 REST).
+- Weather Status (fully OCS). Tables, Polls, Notes, Deck, Bookmarks, Photos skipped — API not OCS or OCS incomplete.
 
 ## Phases
 
@@ -96,7 +97,8 @@
 | File Helpers | — | 26 |
 | File Reminders | 3 | 20 |
 | Forms | 25 | 34 |
-| **Total** | **127** | **805** |
+| Circles | 14 | 31 |
+| **Total** | **141** | **836** |
 
 Files shows 10, but one (`upload_file_from_path`) is only registered when
-`NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 126 tools.
+`NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 140 tools.

@@ -170,8 +170,7 @@ async def _clean_test_data(_cleanup_config: Config) -> AsyncGenerator[None]:
     await client.close()
 
 
-async def _cleanup(client: NextcloudClient) -> None:
-    """Remove all test artifacts from Nextcloud."""
+async def _cleanup_shares(client: NextcloudClient) -> None:
     with contextlib.suppress(Exception):
         shares = await client.ocs_get("apps/files_sharing/api/v1/shares")
         for share in shares:
@@ -180,14 +179,9 @@ async def _cleanup(client: NextcloudClient) -> None:
                 continue
             with contextlib.suppress(Exception):
                 await client.ocs_delete(f"apps/files_sharing/api/v1/shares/{share['id']}")
-    with contextlib.suppress(Exception):
-        await client.dav_delete(TEST_BASE_DIR)
-    with contextlib.suppress(Exception):
-        await client.ocs_delete("apps/notifications/api/v2/notifications")
-    with contextlib.suppress(Exception):
-        await client.ocs_delete("apps/user_status/api/v1/user_status/message")
-    with contextlib.suppress(Exception):
-        await client.ocs_put("apps/user_status/api/v1/user_status/status", data={"statusType": "online"})
+
+
+async def _cleanup_announcements(client: NextcloudClient) -> None:
     with contextlib.suppress(Exception):
         while True:
             announcements = await client.ocs_get("apps/announcementcenter/api/v1/announcements")
@@ -202,6 +196,9 @@ async def _cleanup(client: NextcloudClient) -> None:
                     deleted = True
             if not deleted:
                 break
+
+
+async def _cleanup_forms(client: NextcloudClient) -> None:
     with contextlib.suppress(Exception):
         forms: list[dict[str, object]] = await client.ocs_get("apps/forms/api/v3/forms", params={"type": "owned"})
         for form in forms or []:
@@ -209,3 +206,29 @@ async def _cleanup(client: NextcloudClient) -> None:
             if title.startswith("mcp-test-"):
                 with contextlib.suppress(Exception):
                     await client.ocs_delete(f"apps/forms/api/v3/forms/{form['id']}")
+
+
+async def _cleanup_circles(client: NextcloudClient) -> None:
+    with contextlib.suppress(Exception):
+        circles: list[dict[str, object]] = await client.ocs_get("apps/circles/circles")
+        for circle in circles or []:
+            name = str(circle.get("name", ""))
+            if name.startswith("mcp-test-circle-"):
+                with contextlib.suppress(Exception):
+                    await client.ocs_delete(f"apps/circles/circles/{circle['id']}")
+
+
+async def _cleanup(client: NextcloudClient) -> None:
+    """Remove all test artifacts from Nextcloud."""
+    await _cleanup_shares(client)
+    with contextlib.suppress(Exception):
+        await client.dav_delete(TEST_BASE_DIR)
+    with contextlib.suppress(Exception):
+        await client.ocs_delete("apps/notifications/api/v2/notifications")
+    with contextlib.suppress(Exception):
+        await client.ocs_delete("apps/user_status/api/v1/user_status/message")
+    with contextlib.suppress(Exception):
+        await client.ocs_put("apps/user_status/api/v1/user_status/status", data={"statusType": "online"})
+    await _cleanup_announcements(client)
+    await _cleanup_forms(client)
+    await _cleanup_circles(client)

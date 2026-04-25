@@ -30,9 +30,9 @@ export NEXTCLOUD_PASSWORD=your-app-password
 nc-mcp-server
 ```
 
-## 126 Tools Across 22 Nextcloud Apps
+## 140 Tools Across 23 Nextcloud Apps
 
-A 127th tool, `upload_file_from_path`, is registered only when the operator sets
+A 141st tool, `upload_file_from_path`, is registered only when the operator sets
 `NEXTCLOUD_MCP_UPLOAD_ROOT`. See [Files](#files) for details.
 
 | Category | Tools | Protocol |
@@ -57,6 +57,7 @@ A 127th tool, `upload_file_from_path`, is registered only when the operator sets
 | [Mail](#mail) | accounts, mailboxes, messages, send | OCS |
 | [Collectives](#collectives) | list, pages, create, trash, restore | OCS |
 | [Forms](#forms) | CRUD forms, questions, options, shares, submissions + export | OCS |
+| [Circles (Teams)](#circles-teams) | list, CRUD, members (add/remove/promote), join/leave, search | OCS |
 | [Unified Search](#unified-search) | list providers, search across apps | OCS |
 | [App Management](#app-management) | list, info, enable, disable apps | OCS |
 
@@ -393,6 +394,25 @@ call; the body is streamed in chunks rather than loaded into memory.
 | `delete_form_share` | destructive | Revoke a share |
 | `delete_submission` | destructive | Delete one submission |
 | `delete_all_submissions` | destructive | Delete every submission on a form |
+
+### Circles (Teams)
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_circles` | read | List circles the current user can see |
+| `get_circle` | read | Get a single circle including the current user's membership |
+| `list_circle_members` | read | List members of a circle |
+| `search_circles` | read | Search circles and candidate members (users/groups/mail) by term |
+| `create_circle` | write | Create a circle; caller becomes owner |
+| `update_circle_name` | write | Rename a circle |
+| `update_circle_description` | write | Update description |
+| `update_circle_config` | write | Update config bitmask (VISIBLE, OPEN, INVITE, HIDDEN, etc.) |
+| `add_circle_member` | write | Add a user, group, email, or nested circle as a member |
+| `update_circle_member_level` | write | Promote/demote a member (member/moderator/admin/owner) |
+| `join_circle` | write | Join an open circle |
+| `leave_circle` | write | Leave a circle |
+| `delete_circle` | destructive | Delete a circle |
+| `remove_circle_member` | destructive | Kick a member |
 
 ### Unified Search
 

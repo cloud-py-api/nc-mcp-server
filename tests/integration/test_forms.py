@@ -7,6 +7,7 @@ import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
 from nc_mcp_server.client import NextcloudError
+from nc_mcp_server.state import get_config
 
 from .conftest import McpTestHelper
 
@@ -53,7 +54,7 @@ class TestFormLifecycle:
         created = json.loads(await nc_mcp.call("create_form"))
         await nc_mcp.call("update_form", form_id=created["id"], key_value_pairs={"title": "mcp-test-create-id"})
         assert isinstance(created["id"], int)
-        assert created["ownerId"] == "admin"
+        assert created["ownerId"] == get_config().user
         assert created["hash"]
 
     @pytest.mark.asyncio

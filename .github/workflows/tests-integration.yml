@@ -73,6 +73,7 @@ jobs:
           $OCC "php occ app:install collectives" || echo "collectives already installed"
           $OCC "php occ app:install mail"
           $OCC "php occ app:install forms" || echo "forms already installed"
+          $OCC "php occ app:enable circles" || echo "circles enable failed (may not be shipped)"
           SMTP4DEV_IP=$(docker inspect ${{ job.services.smtp4dev.id }} --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
           echo "smtp4dev IP: $SMTP4DEV_IP"
           $OCC "php occ mail:account:create admin 'Test Mail' test@localhost $SMTP4DEV_IP 143 none test test $SMTP4DEV_IP 25 none test test"
