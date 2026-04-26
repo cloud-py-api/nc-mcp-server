@@ -42,6 +42,7 @@
 - [x] File Reminders tools: get_file_reminder, set_file_reminder, remove_file_reminder (2026-04-22)
 - [x] Forms tools: 25 tools covering forms, questions, options, shares, submissions CRUD + export (2026-04-23)
 - [x] Circles (Teams) tools: 14 tools — list/CRUD circles, member add/remove/level, search, join/leave (2026-04-24)
+- [x] Cospend tools: 16 tools — projects (7), members (4), bills (5) — shared expense tracking (2026-04-26)
 
 ### In Progress
 
@@ -49,7 +50,7 @@
 (none)
 
 ### Next Up
-- Weather Status (fully OCS). Tables, Polls, Notes, Deck, Bookmarks, Photos skipped — API not OCS or OCS incomplete.
+- Cospend follow-ups (Shares: 5 share types; Categories/Payment modes/Currencies; Statistics export). Weather Status (fully OCS, bundled). Tables, Polls, Notes, Deck, Bookmarks, Photos skipped — API not OCS or OCS incomplete.
 
 ## Phases
 
@@ -98,7 +99,8 @@
 | File Reminders | 3 | 20 |
 | Forms | 25 | 34 |
 | Circles | 14 | 31 |
-| **Total** | **141** | **836** |
+| Cospend | 16 | 35 |
+| **Total** | **157** | **871** |
 
 Files shows 10, but one (`upload_file_from_path`) is only registered when
-`NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 140 tools.
+`NEXTCLOUD_MCP_UPLOAD_ROOT` is configured. Default deployments expose 156 tools.

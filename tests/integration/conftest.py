@@ -218,6 +218,16 @@ async def _cleanup_circles(client: NextcloudClient) -> None:
                     await client.ocs_delete(f"apps/circles/circles/{circle['id']}")
 
 
+async def _cleanup_cospend(client: NextcloudClient) -> None:
+    with contextlib.suppress(Exception):
+        projects: list[dict[str, object]] = await client.ocs_get("apps/cospend/api/v1/projects")
+        for project in projects or []:
+            project_id = str(project.get("id", ""))
+            if project_id.startswith("mcp-test-"):
+                with contextlib.suppress(Exception):
+                    await client.ocs_delete(f"apps/cospend/api/v1/projects/{project_id}")
+
+
 async def _cleanup(client: NextcloudClient) -> None:
     """Remove all test artifacts from Nextcloud."""
     await _cleanup_shares(client)
@@ -232,3 +242,4 @@ async def _cleanup(client: NextcloudClient) -> None:
     await _cleanup_announcements(client)
     await _cleanup_forms(client)
     await _cleanup_circles(client)
+    await _cleanup_cospend(client)

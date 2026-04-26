@@ -58,6 +58,7 @@ A 141st tool, `upload_file_from_path`, is registered only when the operator sets
 | [Collectives](#collectives) | list, pages, create, trash, restore | OCS |
 | [Forms](#forms) | CRUD forms, questions, options, shares, submissions + export | OCS |
 | [Circles (Teams)](#circles-teams) | list, CRUD, members (add/remove/promote), join/leave, search | OCS |
+| [Cospend](#cospend) | shared expense tracking — projects, members, bills | OCS |
 | [Unified Search](#unified-search) | list providers, search across apps | OCS |
 | [App Management](#app-management) | list, info, enable, disable apps | OCS |
 
@@ -413,6 +414,29 @@ call; the body is streamed in chunks rather than loaded into memory.
 | `leave_circle` | write | Leave a circle |
 | `delete_circle` | destructive | Delete a circle |
 | `remove_circle_member` | destructive | Kick a member |
+
+### Cospend
+
+Shared expense tracking ("who paid for what"). Requires the [Cospend](https://apps.nextcloud.com/apps/cospend) app to be installed and enabled. All routes are OCS at `/ocs/v2.php/apps/cospend/api/v1/`.
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `list_cospend_projects` | read | List projects the user can access |
+| `get_cospend_project` | read | Get full project info (members, balance, shares, settings) |
+| `get_cospend_project_statistics` | read | Per-member spending stats (paid/spent/balance) with filters |
+| `get_cospend_project_settlement` | read | Suggested reimbursement transactions to settle a project |
+| `list_cospend_members` | read | List members of a project |
+| `list_cospend_bills` | read | List bills with filters (payer, category, search, pagination) |
+| `get_cospend_bill` | read | Get a single bill |
+| `create_cospend_project` | write | Create a project (caller becomes ADMIN) |
+| `update_cospend_project` | write | Update project name, currency, sort, archive, etc. |
+| `create_cospend_member` | write | Add a member (free-form name or linked to a Nextcloud user) |
+| `update_cospend_member` | write | Update name/weight/color/activated/userid |
+| `create_cospend_bill` | write | Create a bill (defaults date to today if neither date nor timestamp set) |
+| `update_cospend_bill` | write | Update any bill field |
+| `delete_cospend_project` | destructive | Delete a project and all its data |
+| `delete_cospend_member` | destructive | Delete (or soft-disable if member has bills) |
+| `delete_cospend_bill` | destructive | Delete a bill (default: trash; pass `move_to_trash=False` to purge) |
 
 ### Unified Search
 
