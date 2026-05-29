@@ -111,6 +111,7 @@ class TestUnifiedSearch:
         assert len(first["entries"]) <= limit
         if not first["has_more"]:
             pytest.skip("Not enough pagtest files seeded for a multi-page search")
+        assert first["cursor"], "has_more is true, so the response must carry a cursor"
 
         seen = {e["title"] for e in first["entries"]}
         cursor = str(first["cursor"])
@@ -126,6 +127,7 @@ class TestUnifiedSearch:
                 pages += 1
             if not data["has_more"]:
                 break
+            assert data["cursor"], "has_more is true, so the response must carry a cursor"
             next_cursor = str(data["cursor"])
             assert next_cursor != cursor, "Cursor must advance across pages"
             cursor = next_cursor
