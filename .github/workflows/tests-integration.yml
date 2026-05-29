@@ -102,7 +102,7 @@ jobs:
         run: pytest tests/integration/ -v -m integration --ignore=tests/integration/test_session_cache.py --cov=nc_mcp_server --cov-report=xml:coverage-integration.xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
         with:
           files: coverage-integration.xml
           flags: integration,nc${{ matrix.nextcloud-version }}
@@ -173,7 +173,7 @@ jobs:
         run: pytest tests/integration/test_session_cache.py -v -m integration --cov=nc_mcp_server --cov-report=xml:coverage-session-cache.xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
         with:
           files: coverage-session-cache.xml
           flags: session-cache
@@ -255,7 +255,7 @@ jobs:
         run: pytest tests/integration/test_user_permissions.py -v -m integration --cov=nc_mcp_server --cov-report=xml:coverage-user-perms.xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v5
         with:
           files: coverage-user-perms.xml
           flags: user-permissions
