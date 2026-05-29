@@ -483,7 +483,7 @@ export NEXTCLOUD_PASSWORD=admin
 pytest tests/integration/ -v
 ```
 
-CI automatically runs integration tests against Nextcloud 32 and 33 Docker containers.
+CI automatically runs integration tests against the two newest released Nextcloud versions — currently 32 and 33 — using the official Docker images. Nextcloud 34 (GA 2026-06-09) joins the matrix once its image is published on Docker Hub.
 
 ## About This Project
 

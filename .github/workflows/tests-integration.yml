@@ -13,6 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # NC34 GA 2026-06-09: replace "32" with "34" here and in the two jobs below once nextcloud:34 publishes.
         nextcloud-version: ["32", "33"]
     services:
       nextcloud:

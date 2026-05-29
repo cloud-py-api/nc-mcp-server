@@ -51,25 +51,38 @@ async def _ensure_pagination_conversations(nc_mcp: McpTestHelper) -> None:
 
 
 async def _ensure_pagination_events(nc_mcp: McpTestHelper) -> None:
-    """Create calendar events if they don't already exist."""
-    result = json.loads(
-        await nc_mcp.call(
-            "get_events",
-            calendar_id="personal",
-            start="2027-06-01T00:00:00Z",
-            end="2027-06-30T23:59:59Z",
-            limit=200,
+    """Create calendar events if they don't already exist.
+
+    Idempotency is keyed on the event summary text, not UID -- create_event
+    generates random server-side UUIDs, so a UID-based check would think no
+    events exist and add a fresh batch on every run, accumulating duplicates.
+    """
+    expected_summaries = {f"Pagination Test Event {i:03d}" for i in range(1, ITEM_COUNT + 1)}
+    existing_summaries: set[str] = set()
+    offset = 0
+    while True:
+        result = json.loads(
+            await nc_mcp.call(
+                "get_events",
+                calendar_id="personal",
+                start="2027-06-01T00:00:00Z",
+                end="2027-06-30T23:59:59Z",
+                limit=500,
+                offset=offset,
+            )
         )
-    )
-    existing_uids = {e["uid"] for e in result["data"]}
+        existing_summaries.update(e.get("summary", "") for e in result["data"])
+        if not result["pagination"]["has_more"] or expected_summaries.issubset(existing_summaries):
+            break
+        offset += 500
     for i in range(1, ITEM_COUNT + 1):
-        uid = f"{PREFIX}-event-{i:03d}"
-        if uid not in existing_uids:
+        summary = f"Pagination Test Event {i:03d}"
+        if summary not in existing_summaries:
             hour = i % 24
             await nc_mcp.call(
                 "create_event",
                 calendar_id="personal",
-                summary=f"Pagination Test Event {i:03d}",
+                summary=summary,
                 start=f"2027-06-01T{hour:02d}:00:00Z",
                 end=f"2027-06-01T{hour:02d}:30:00Z",
             )
