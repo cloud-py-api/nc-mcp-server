@@ -44,6 +44,10 @@ class TestGetUserStatus:
     async def test_get_own_status_when_never_set(self, nc_mcp: McpTestHelper) -> None:
         """A fresh user who never set a status gets a 404 from the API.
         The tool should handle this gracefully and return a default offline status."""
+        # Cleanup uses nc_mcp.client (admin, captured at fixture setup) directly rather than
+        # the delete_user tool, because create_server(fresh_config) below swaps the global
+        # client singleton to the fresh non-admin user -- so the tool's get_client() would
+        # return the fresh client (closed and unauthorized) and silently leak the test user.
         try:
             await nc_mcp.call("create_user", user_id="mcp-fresh-status", password="t3St*Pw!xQ9#mK2z")
             fresh_config = Config(
@@ -64,7 +68,7 @@ class TestGetUserStatus:
                 await fresh_helper.client.close()
         finally:
             with contextlib.suppress(Exception):
-                await nc_mcp.call("delete_user", user_id="mcp-fresh-status")
+                await nc_mcp.client.ocs_delete("cloud/users/mcp-fresh-status")
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_user_status(self, nc_mcp: McpTestHelper) -> None:

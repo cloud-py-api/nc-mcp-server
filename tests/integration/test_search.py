@@ -100,18 +100,38 @@ class TestUnifiedSearch:
 
     @pytest.mark.asyncio
     async def test_search_pagination(self, nc_mcp: McpTestHelper) -> None:
-        result1 = await nc_mcp.call("unified_search", provider="files", term="pagtest", limit=2)
-        data1 = json.loads(result1)
-        if not data1["has_more"]:
-            pytest.skip("Not enough pagtest files for pagination test")
-        cursor = str(data1["cursor"])
+        # NC's FilesSearchProvider issues its DB query without an ORDER BY, so on Postgres
+        # the offset-based pages can overlap or skip rows (SQLite happens to be stable by
+        # insertion order). Full enumeration of the seeded files is therefore not guaranteed,
+        # so we verify the pagination *contract* instead: limit is respected, the cursor
+        # advances, follow-up pages keep returning results, and paging surfaces more distinct
+        # results than a single page holds.
+        limit = 5
+        first = json.loads(await nc_mcp.call("unified_search", provider="files", term="pagtest", limit=limit))
+        assert len(first["entries"]) <= limit
+        if not first["has_more"]:
+            pytest.skip("Not enough pagtest files seeded for a multi-page search")
 
-        result2 = await nc_mcp.call("unified_search", provider="files", term="pagtest", limit=2, cursor=cursor)
-        data2 = json.loads(result2)
-        assert data2["entries"]
-        titles1 = {e["title"] for e in data1["entries"]}
-        titles2 = {e["title"] for e in data2["entries"]}
-        assert not titles1.intersection(titles2), "Pages should not overlap"
+        seen = {e["title"] for e in first["entries"]}
+        cursor = str(first["cursor"])
+        pages = 1
+        for _ in range(40):
+            data = json.loads(
+                await nc_mcp.call("unified_search", provider="files", term="pagtest", limit=limit, cursor=cursor)
+            )
+            entries = data["entries"]
+            assert len(entries) <= limit
+            if entries:
+                seen.update(e["title"] for e in entries)
+                pages += 1
+            if not data["has_more"]:
+                break
+            next_cursor = str(data["cursor"])
+            assert next_cursor != cursor, "Cursor must advance across pages"
+            cursor = next_cursor
+
+        assert pages >= 2, "Expected pagination to yield more than one page"
+        assert len(seen) > limit, f"Pagination should surface more than one page of distinct results; got {len(seen)}"
 
     @pytest.mark.asyncio
     async def test_search_nonexistent_provider_raises(self, nc_mcp: McpTestHelper) -> None:

@@ -12,6 +12,7 @@ individual test runs but is ephemeral in CI (container destroyed).
 """
 
 import sys
+import time
 import xml.etree.ElementTree as ET
 
 import niquests
@@ -172,6 +173,39 @@ def seed_contacts(s: niquests.Session, url: str, user: str) -> None:
     print(f"  {COUNT} contacts with categories and varied name structures")
 
 
+def _fetch_all_comments(s: niquests.Session, url: str, file_id: str) -> list[tuple[str, str, str]]:
+    """Return all comments on file_id as list of (id, message, creation_ts)."""
+    out: list[tuple[str, str, str]] = []
+    offset = 0
+    while True:
+        report = s.request(
+            "REPORT",
+            f"{url}/remote.php/dav/comments/files/{file_id}",
+            data=(
+                '<?xml version="1.0" encoding="utf-8"?>'
+                '<oc:filter-comments xmlns:oc="http://owncloud.org/ns">'
+                f"<oc:limit>100</oc:limit><oc:offset>{offset}</oc:offset>"
+                "</oc:filter-comments>"
+            ),
+            headers={"Content-Type": "application/xml"},
+        )
+        batch: list[tuple[str, str, str]] = []
+        for resp_el in ET.fromstring(report.text).findall("{DAV:}response"):
+            href = resp_el.find("{DAV:}href")
+            msg_el = resp_el.find(".//{http://owncloud.org/ns}message")
+            ts_el = resp_el.find(".//{http://owncloud.org/ns}creationDateTime")
+            if href is not None and msg_el is not None and msg_el.text and ts_el is not None:
+                cid = href.text.rstrip("/").split("/")[-1]
+                batch.append((cid, msg_el.text, ts_el.text or ""))
+        if not batch:
+            break
+        out.extend(batch)
+        if len(batch) < 100:
+            break
+        offset += 100
+    return out
+
+
 def seed_comments(s: niquests.Session, url: str, user: str) -> None:
     """Create a dedicated file and add many comments to it."""
     dav = f"{url}/remote.php/dav/files/{user}"
@@ -196,13 +230,25 @@ def seed_comments(s: niquests.Session, url: str, user: str) -> None:
         return
     file_id = fileid_el.text
 
+    expected = {f"Pagination test comment {i:03d}" for i in range(1, COUNT + 1)}
+    existing = _fetch_all_comments(s, url, file_id)
+    expected_ts = [ts for _, msg, ts in existing if msg in expected]
+    if expected.issubset({m for _, m, _ in existing}) and len(set(expected_ts)) >= COUNT:
+        print(f"  {COUNT} comments on file {file_id} (already present with distinct timestamps)")
+        return
+
+    for cid, _, _ in existing:
+        s.delete(f"{url}/remote.php/dav/comments/files/{file_id}/{cid}")
+
     for i in range(1, COUNT + 1):
         s.post(
             f"{url}/remote.php/dav/comments/files/{file_id}",
             json={"actorType": "users", "verb": "comment", "message": f"Pagination test comment {i:03d}"},
             headers={"Content-Type": "application/json"},
         )
-    print(f"  {COUNT} comments on file {file_id}")
+        if i < COUNT:
+            time.sleep(1.05)
+    print(f"  {COUNT} comments on file {file_id} (reset and re-created with 1.05s spacing for stable pagination)")
 
 
 def main() -> None:
